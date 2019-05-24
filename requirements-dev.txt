@@ -1,0 +1,12 @@
+-r requirements.txt
+-r docs/requirements.txt
+
+pre-commit
+flake8
+yapf
+isort
+
+pytest
+pytest-cov
+pytest-xdist
+codecov
