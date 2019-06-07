@@ -10,3 +10,5 @@ pytest
 pytest-cov
 pytest-xdist
 codecov
+
+flask-requests-adapter==0.0.3
