@@ -97,6 +97,7 @@ def test_inheritance(app, client_maker):
             'pk_name': 'id',
             'collection_name': 'engineer',
             'polymorphic': {
+                'identity': 'engineer',
                 'parent': 'Person',
             },
             'attributes': {

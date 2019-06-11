@@ -23,65 +23,50 @@ def get_is_valid_validator(included, excluded):
     return is_valid
 
 
+def is_polymorphic(model, check_var):
+    has_mapper_args = hasattr(model, '__mapper_args__')
+    if has_mapper_args and check_var in model.__mapper_args__:
+        return True
+    return False
+
+
 class DataModelRenderer:
-    def __init__(self, app, db):
+    def __init__(self, app, db, options):
         self.app = app
         self.db = db
+        self.options = options
+        self.model_renderer = ClassDefinitionRenderer(app)
+        self.method_renderer = MethodDefinitionRenderer(app, options)
 
-    def render(self, models, method_renderer):
-        data_model = {}
-        flagged_for_inheritence = {}
-        model_renderer = ClassDefinitionRenderer(self.app)
+    def render(self, model, kwargs):
+        collection_name = kwargs['collection_name']
+        model_render = self.model_renderer.render(model, **kwargs)
+        model_render['methods'] = self.method_renderer.render(model, collection_name)
+        return model_render
 
-        for model, kwargs in models.items():
-            name = model.__name__
-            model_render = model_renderer.render(model, **kwargs)
-            model_render['methods'] = method_renderer.methods[name]
-            polymorphic_info = self.flag_inheritance_models(model)
-            if polymorphic_info:
-                flagged_for_inheritence[name] = polymorphic_info
-            data_model[name] = model_render
-
-        # update child models with the attributes and relations of their parent
-        for model, inheriting_from in flagged_for_inheritence.items():
-            self.resolve_inheritance(model, inheriting_from, data_model)
-        return data_model
-
-    def flag_inheritance_models(self, model):
-        is_polymorphic = (hasattr(model, '__mapper_args__') and
-                          'polymorphic_identity' in model.__mapper_args__)
-        if is_polymorphic:
-            
-            parent = None
+    def render_polymorphic(self, model, identities):
+        polymorphic_info = {}
+        if is_polymorphic(model, 'polymorphic_on'):
+            mapper_args = model.__mapper_args__
+            on = mapper_args['polymorphic_on']
+            if not isinstance(on, str):
+                on = on.key
+            polymorphic_info['on'] = on
+            polymorphic_info['identities'] = identities
+        if is_polymorphic(model, 'polymorphic_identity'):
+            mapper_args = model.__mapper_args__
             for kls in model.__bases__:
-                if issubclass(kls, self.db.Model) and kls is not self.db.Model:
-                    parent = kls
-            if parent:
-                on = parent.__mapper_args__['polymorphic_on']
-                if not isinstance(on, str):
-                    on = on.key
-                return {
-                    'on': on,
-                    'parent': parent.__name__,
-                    'identity': model.__mapper_args__['polymorphic_identity'],
-                }
-
-    def resolve_inheritance(self, model, inheriting_from, data_model):
-        idef = data_model[inheriting_from['parent']]
-        odef = data_model[model]
-        odef['attributes'].update(idef['attributes'])
-        odef['relations'].update(idef['relations'])
-        odef['polymorphic'] = {'parent': inheriting_from['parent']}
-        idef.setdefault('polymorphic', {})['on'] = inheriting_from['on']
-        idef['polymorphic'].setdefault(
-            'identities', {})[inheriting_from['identity']] = model
+                if is_polymorphic(kls, 'polymorphic_on'):
+                    polymorphic_info['parent'] = kls.__name__
+                    polymorphic_info['identity'] = mapper_args['polymorphic_identity']
+        return polymorphic_info
 
 
 class ClassDefinitionRenderer:
     def __init__(self, app):
         self.app = app
 
-    def render(self, model, collection_name, bp_name, included, excluded):
+    def render(self, model, collection_name, included, excluded):
         is_valid = get_is_valid_validator(included, excluded)
 
         attribute_dict = self.render_attributes(model, is_valid)
@@ -102,9 +87,8 @@ class ClassDefinitionRenderer:
         }
 
     def render_attributes(self, model, is_valid):
-        tbl = model.__table__
         attribute_dict = {}
-        for column in tbl.columns:
+        for column in sqla_inspect(model).columns:
             if is_valid(column.name):
                 ctype = column.type.__class__.__name__.lower()
                 attribute_dict[column.name] = ctype
@@ -172,12 +156,11 @@ class MethodDefinitionRenderer:
     def __init__(self, app, options):
         self.app = app
         self.options = options
-        self.methods = {}
 
     def render(self, model, collection_name):
-        name = model.__name__
-        self.methods[name] = self.compile_method_list(model)
-        self.add_method_endpoints(collection_name, model, self.methods[name])
+        methods = self.compile_method_list(model)
+        self.add_method_endpoints(collection_name, model, methods)
+        return methods
 
     def compile_method_list(self, model):
         methods = {}
