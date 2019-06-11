@@ -2,7 +2,7 @@
 codecov
 flake8
 
-flask-requests-adapter==0.0.3
+requests-flask-adapter==0.0.3
 isort
 
 pre-commit==1.15.2
