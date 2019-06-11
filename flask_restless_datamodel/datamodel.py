@@ -165,14 +165,7 @@ class DataModel(object):
 
     def build_stub_environ(self, app):
         kw = {
-            'environ_base': {
-                'REMOTE_ADDR': "127.0.0.1",
-                'HTTP_USER_AGENT': 'RequestsFlask/0.0.1'
-            },
-            'method': 'GET',
-            'data': None,
-            'headers': {},
-            'base_url': 'http://stub'
+            'base_url': 'http://localhost'
         }
         builder = make_test_environ_builder(self.app, **kw)
         try:
