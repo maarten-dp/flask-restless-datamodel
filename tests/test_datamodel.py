@@ -78,7 +78,7 @@ def test_datamodel(app, client_maker):
     }
 
     client = client_maker(app)
-    res = client.get('http://app/api/restless-client-datamodel').json()
+    res = client.get('http://app/api/flask-restless-datamodel').json()
     assert res == expected
 
 
@@ -139,7 +139,7 @@ def test_inheritance(app, client_maker):
     }
 
     client = client_maker(app)
-    res = client.get('http://app/api/restless-client-datamodel').json()
+    res = client.get('http://app/api/flask-restless-datamodel').json()
     assert res == expected
 
 
@@ -196,7 +196,7 @@ def exposed_method_model_app(app):
 
 def test_exposed_methods(exposed_method_model_app, client_maker):
     client = client_maker(exposed_method_model_app)
-    res = client.get('http://app/api/restless-client-datamodel').json()
+    res = client.get('http://app/api/flask-restless-datamodel').json()
 
     expected = {
         'Person': {
@@ -250,7 +250,6 @@ def test_call_exposed_method(exposed_method_model_app, client_maker):
 def test_call_exposed_method_with_model(exposed_method_model_app,
                                         client_maker):
     client = client_maker(exposed_method_model_app)
-    client.get('http://app/api/restless-client-datamodel')
     url = 'http://app/api/method/person/1/what_does_this_func_even_do'
 
     class Person:

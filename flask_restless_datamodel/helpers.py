@@ -12,7 +12,6 @@ def register_serializer(model, pk_name):
         # TODO refine for composite keys
         return getattr(value, pk_name)
 
-    print("registering")
     register_class(model.__name__, model, serialize_model, load_model)
 
 
