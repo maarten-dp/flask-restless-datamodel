@@ -1,13 +1,12 @@
-from .helpers import register_serializer, run_object_method
-from flask import current_app
 import inspect
-from sqlalchemy.inspection import inspect as sqla_inspect
-from sqlalchemy.ext.hybrid import hybrid_property
-from flask_restless.helpers import (primary_key_name,
-                                    get_related_association_proxy_model)
+
+from flask_restless.helpers import get_related_association_proxy_model, primary_key_name
 from sqlalchemy.ext.associationproxy import AssociationProxy
-from sqlalchemy.orm.properties import RelationshipProperty, ColumnProperty
-from copy import copy
+from sqlalchemy.ext.hybrid import hybrid_property
+from sqlalchemy.inspection import inspect as sqla_inspect
+from sqlalchemy.orm.properties import ColumnProperty, RelationshipProperty
+
+from .helpers import register_serializer, run_object_method
 
 
 def get_is_valid_validator(included, excluded):
@@ -20,6 +19,7 @@ def get_is_valid_validator(included, excluded):
         if included:
             valid_incl = column in included
         return valid_excl and valid_incl
+
     return is_valid
 
 
@@ -41,7 +41,8 @@ class DataModelRenderer:
     def render(self, model, kwargs):
         collection_name = kwargs['collection_name']
         model_render = self.model_renderer.render(model, **kwargs)
-        model_render['methods'] = self.method_renderer.render(model, collection_name)
+        model_render['methods'] = self.method_renderer.render(
+            model, collection_name)
         return model_render
 
     def render_polymorphic(self, model, identities):
@@ -58,7 +59,8 @@ class DataModelRenderer:
             for kls in model.__bases__:
                 if is_polymorphic(kls, 'polymorphic_on'):
                     polymorphic_info['parent'] = kls.__name__
-                    polymorphic_info['identity'] = mapper_args['polymorphic_identity']
+                    polymorphic_info['identity'] = mapper_args[
+                        'polymorphic_identity']
         return polymorphic_info
 
 
@@ -113,8 +115,10 @@ class ClassDefinitionRenderer:
 
     def render_hybrid_properties(self, model, is_valid):
         attribute_dict = {}
-        hybrid_properties = [a for a in sqla_inspect(model).all_orm_descriptors
-                             if isinstance(a, hybrid_property)]
+        hybrid_properties = [
+            a for a in sqla_inspect(model).all_orm_descriptors
+            if isinstance(a, hybrid_property)
+        ]
         for attribute in hybrid_properties:
             if is_valid(attribute):
                 attribute_dict[attribute.__name__] = 'hybrid'
@@ -130,7 +134,8 @@ class ClassDefinitionRenderer:
             # but not all cases have it.
             # v == v.__get__(None, model), but we do this to bind the model to
             # the remote_attr and from then on it's usable for further inspection
-            if is_proxy and hasattr(v.__get__(None, model).remote_attr, 'property'):
+            if is_proxy and hasattr(
+                    v.__get__(None, model).remote_attr, 'property'):
                 proxies[k] = v.__get__(None, model)
 
         for name, attr in proxies.items():
@@ -142,7 +147,8 @@ class ClassDefinitionRenderer:
                 remote_class = get_related_association_proxy_model(attr)
                 foreign_keys[name] = {
                     'foreign_model': remote_class.__name__,
-                    'relation_type': 'MANYTOONE' if attr.scalar else 'ONETOMANY',
+                    'relation_type': 'MANYTOONE'
+                                     if attr.scalar else 'ONETOMANY',
                     'is_proxy': True
                 }
             elif isinstance(attr.remote_attr.property, ColumnProperty):
@@ -164,8 +170,10 @@ class MethodDefinitionRenderer:
 
     def compile_method_list(self, model):
         methods = {}
-        include_internal = self.options.get('include_model_internal_functions', False)
-        for name, fn in inspect.getmembers(model, predicate=inspect.isfunction):
+        include_internal = self.options.get('include_model_internal_functions',
+                                            False)
+        for name, fn in inspect.getmembers(
+                model, predicate=inspect.isfunction):
             if name.startswith('__'):
                 continue
             if name.startswith('_') and not include_internal:

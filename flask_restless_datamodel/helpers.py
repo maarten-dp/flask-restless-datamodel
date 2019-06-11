@@ -1,5 +1,6 @@
-import flask
 import json
+
+import flask
 from cereal_lazer import dumps, loads, register_class
 
 
@@ -21,5 +22,6 @@ def run_object_method(instid, function_name, model):
         return {}
     kwargs = loads(flask.request.get_json()['payload'], fmt='msgpack')
     return json.dumps({
-        'payload': dumps(getattr(instance, function_name)(**kwargs), fmt='msgpack')
+        'payload': dumps(
+            getattr(instance, function_name)(**kwargs), fmt='msgpack')
     })

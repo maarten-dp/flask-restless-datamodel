@@ -1,14 +1,13 @@
 -r requirements.txt
--r docs/requirements.txt
-
-pre-commit
-flake8
-yapf
-isort
-
-pytest
-pytest-cov
-pytest-xdist
 codecov
+flake8
 
 flask-requests-adapter==0.0.3
+isort
+
+pre-commit==1.15.2
+
+pytest >= 4.5.0
+pytest-cov
+pytest-xdist
+yapf

@@ -17,5 +17,5 @@ def client_maker():
     def client(app):
         Session.register('http://app', app)
         return Session()
-    return client
 
+    return client

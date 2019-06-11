@@ -1,15 +1,13 @@
 import json
-import flask
-import flask_restless
+from collections import defaultdict
+from functools import wraps
 from itertools import chain
-from flask import abort, Response
-from .helpers import run_object_method
-from .render import DataModelRenderer, MethodDefinitionRenderer
+
+import flask_restless
+from flask import Response, abort
 from flask.testing import make_test_environ_builder
 
-from functools import wraps
-import inspect
-from collections import defaultdict
+from .render import DataModelRenderer
 
 
 def catch_model_configuration(dispatch_request):
@@ -29,11 +27,15 @@ def catch_model_configuration(dispatch_request):
 
     And this way, we're at least dropping the restrictive part :)
     """
+
     def wrapper(self, *args, **kwargs):
         def clean(columns):
             return columns or []
-        include_columns = chain(clean(self.include_columns), clean(self.include_relations))
-        exclude_columns = chain(clean(self.exclude_columns), clean(self.exclude_relations))
+
+        include_columns = chain(
+            clean(self.include_columns), clean(self.include_relations))
+        exclude_columns = chain(
+            clean(self.exclude_columns), clean(self.exclude_relations))
         # Putting back the old and original dispatch_request method to continue
         # normal operation from this point on.
         self.__class__.dispatch_request = dispatch_request
@@ -41,6 +43,7 @@ def catch_model_configuration(dispatch_request):
             'include': list(include_columns),
             'exclude': list(exclude_columns)
         }
+
     return wrapper
 
 
@@ -57,11 +60,12 @@ def attach_listener(create_blueprint, data_model):
         api_info = data_model.api_manager.created_apis_for[model]
         data_model.register_model(model, api_info, app)
         return blueprint
+
     return wrapper
 
 
 class DataModel(object):
-    __tablename__ = 'restless-client-datamodel'
+    __tablename__ = 'flask-restless-datamodel'
 
     def __init__(self, api_manager, **options):
         """
@@ -70,12 +74,11 @@ class DataModel(object):
         datamodel, and preferably in the same intuitive way that you register
         your models.
 
-        This object functions as a puppet model to give the user the feeling 
+        This object functions as a puppet model to give the user the feeling
         like they are registering just another model they want to expose.
         """
         api_manager.create_api_blueprint = attach_listener(
-            api_manager.create_api_blueprint, self
-        )
+            api_manager.create_api_blueprint, self)
         self.api_manager = api_manager
         self.data_model = {}
         self.polymorphic_info = defaultdict(dict)
@@ -116,14 +119,13 @@ class DataModel(object):
             'GET_MANY': [self.intercept_and_return_datamodel]
         }
 
-    
     def intercept_and_return_datamodel(self, *args, **kwargs):
         """
         This method must be called as a preprocessor to the actual restless
         api call. It will construct the json data model, if it hasn't already been
         constructed, and return it.
 
-        The goal of running this method as a preprocessor is so that we have 
+        The goal of running this method as a preprocessor is so that we have
         chance to intercept the request before it gets sent to do the actual
         restless database query.
 
@@ -133,7 +135,7 @@ class DataModel(object):
         as by now we have all the data we need to return our request.
         """
         # (Mis)using the flask abort to return the datamodel before the
-        # request gets forwarded to the actual db querying 
+        # request gets forwarded to the actual db querying
         abort(Response(json.dumps(self.data_model)))
 
     def get_restless_model_conf(self, model, api_info, app):
@@ -141,17 +143,18 @@ class DataModel(object):
         This method will try to find the corresponding view within the registered
         blueprints in flask-restless and momentarily replace it with a function
         that is able to distil the relevant infomation we need to construct a
-        datamodel that is conform to what constraints were defined in 
-        flask restless when registering models. 
-        Afterwards it will replace the function handle back to its original
-        function.
+        datamodel that is conform to what constraints were defined in
+        flask-restless when registering models.
+        After the first call it will replace the function handle back to its
+        original function.
         """
         api_format = flask_restless.APIManager.APINAME_FORMAT
         endpoint = api_format.format('{1}.{0}'.format(*api_info))
 
         view_func = app.view_functions[endpoint]
 
-        dispatch_fn = catch_model_configuration(view_func.view_class.dispatch_request)
+        dispatch_fn = catch_model_configuration(
+            view_func.view_class.dispatch_request)
         view_func.view_class.dispatch_request = dispatch_fn
 
         with app.request_context(self.build_stub_environ(app)):
@@ -164,9 +167,7 @@ class DataModel(object):
         }
 
     def build_stub_environ(self, app):
-        kw = {
-            'base_url': 'http://localhost'
-        }
+        kw = {'base_url': 'http://localhost'}
         builder = make_test_environ_builder(self.app, **kw)
         try:
             environ = builder.get_environ()
