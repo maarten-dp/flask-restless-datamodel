@@ -52,9 +52,11 @@ def attach_listener(create_blueprint, data_model):
             data_model.init(app)
             kwargs['preprocessors'] = data_model.processors
             return create_blueprint(model, *args, **kwargs)
+        blueprint = create_blueprint(model, *args, **kwargs)
+        app.register_blueprint(blueprint)
         api_info = data_model.api_manager.created_apis_for[model]
         data_model.register_model(model, api_info, app)
-        return create_blueprint(model, *args, **kwargs)
+        return blueprint
     return wrapper
 
 

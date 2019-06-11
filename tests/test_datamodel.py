@@ -34,9 +34,9 @@ def test_datamodel(app, client_maker):
 
     manager = flask_restless.APIManager(app, flask_sqlalchemy_db=db)
     manager.create_api(Person, methods=['GET'], include_columns=['name'])
-    manager.create_api(Computer, methods=['GET'], collection_name='compjutahs', exclude_columns=['name'])
     data_model = DataModel(manager)
     manager.create_api(data_model, methods=['GET'])
+    manager.create_api(Computer, methods=['GET'], collection_name='compjutahs', exclude_columns=['name'])
 
     expected = {
         'Computer': {
