@@ -1,8 +1,7 @@
 -r requirements.txt
 codecov
 flake8
-
-requests-flask-adapter==0.0.3
+flask-sqlalchemy
 isort
 
 pre-commit==1.15.2
@@ -10,4 +9,6 @@ pre-commit==1.15.2
 pytest >= 4.5.0
 pytest-cov
 pytest-xdist
+
+requests-flask-adapter==0.0.3
 yapf
