@@ -120,7 +120,7 @@ class ClassDefinitionRenderer:
             if isinstance(a, hybrid_property)
         ]
         for attribute in hybrid_properties:
-            if is_valid(attribute):
+            if is_valid(attribute.__name__):
                 attribute_dict[attribute.__name__] = 'hybrid'
         return attribute_dict
 

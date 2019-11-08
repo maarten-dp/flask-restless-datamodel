@@ -136,7 +136,10 @@ class DataModel(object):
         """
         # (Mis)using the flask abort to return the datamodel before the
         # request gets forwarded to the actual db querying
-        abort(Response(json.dumps(self.data_model)))
+        abort(
+            Response(
+                response=json.dumps(self.data_model),
+                mimetype='application/json'))
 
     def get_restless_model_conf(self, model, api_info, app):
         """

@@ -240,7 +240,13 @@ def to_method_params(body):
 def test_call_exposed_method(exposed_method_model_app, client_maker):
     client = client_maker(exposed_method_model_app)
     url = 'http://app/api/method/person/1/age_in_x_years_y_months'
-    body = to_method_params({'y_offset': 10, 'm_offset': 3})
+    body = to_method_params({
+        'args': [],
+        'kwargs': {
+            'y_offset': 10,
+            'm_offset': 3
+        }
+    })
     res = sr.loads(
         client.post(url, json=body).json()['payload'], fmt='msgpack')
     expected = date(2028, 4, 1)
@@ -259,7 +265,12 @@ def test_call_exposed_method_with_model(exposed_method_model_app,
         NAME_BY_CLASS.__getitem__.return_value = 'Person'
         with patch('cereal_lazer.serialize.all.CLASSES') as CLASSES:
             CLASSES.items.return_value = [(Person, (lambda x: x.id, None))]
-            body = to_method_params({'person': Person()})
+            body = to_method_params({
+                'args': [],
+                'kwargs': {
+                    'person': Person()
+                }
+            })
     res = sr.loads(
         client.post(url, json=body).json()['payload'], fmt='msgpack')
     assert res.name == 'Jim Darkmagic'
