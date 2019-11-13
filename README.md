@@ -4,7 +4,7 @@
 
 ## Purpose
 
-This library is one part of a two part piece of code. It fulfills the server part to the flask-restless client. What it does is allow you to render your datamodel in a convinient JSON format.
+This library is one part of a two part piece of code. It fulfills the server part to the flask-restless client. What it does is allow you to render your datamodel in a convenient JSON format.
 This JSON format is then read by the flask-restless-client, which in turn uses it to built itself, allowing for transparent access to your data model through HTTP.
 
 ## Quickstart
@@ -21,7 +21,7 @@ from my_models import Person, Computer, db
 app = flask.Flask(__name__)
 db = SQLAlchemy(app)
 
-#Create a datamodel instance to register later
+# Create a datamodel instance to register later
 data_model = DataModel(manager)
 
 manager = flask_restless.APIManager(app, flask_sqlalchemy_db=db)
