@@ -68,7 +68,8 @@ class ClassDefinitionRenderer:
     def __init__(self, app):
         self.app = app
 
-    def render(self, model, collection_name, included, excluded):
+    def render(self, model, collection_name, included, excluded, serialize,
+               deserialize):
         is_valid = get_is_valid_validator(included, excluded)
 
         attribute_dict = self.render_attributes(model, is_valid)
@@ -79,7 +80,7 @@ class ClassDefinitionRenderer:
         with self.app.app_context():
             pk_name = primary_key_name(model)
 
-        register_serializer(model, pk_name)
+        register_serializer(model, pk_name, serialize, deserialize)
 
         return {
             'pk_name': pk_name,

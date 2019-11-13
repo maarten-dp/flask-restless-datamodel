@@ -4,13 +4,15 @@ import flask
 from cereal_lazer import dumps, loads, register_class
 
 
-def register_serializer(model, pk_name):
+def register_serializer(model, pk_name, serialize, deserialize):
     def load_model(value):
-        return model.query.get(value)
+        pkval = value.get(pk_name)
+        if pkval:
+            return model.query.filter_by(**{pk_name: pkval}).one_or_none()
+        return deserialize(value)
 
     def serialize_model(value):
-        # TODO refine for composite keys
-        return getattr(value, pk_name)
+        return serialize(value)
 
     register_class(model.__name__, model, serialize_model, load_model)
 

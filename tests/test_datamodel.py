@@ -264,7 +264,7 @@ def test_call_exposed_method_with_model(exposed_method_model_app,
     with patch('cereal_lazer.NAME_BY_CLASS') as NAME_BY_CLASS:
         NAME_BY_CLASS.__getitem__.return_value = 'Person'
         with patch('cereal_lazer.serialize.all.CLASSES') as CLASSES:
-            CLASSES.items.return_value = [(Person, (lambda x: x.id, None))]
+            CLASSES.items.return_value = [(Person, (lambda x: {'id': 1}, None))]
             body = to_method_params({
                 'args': [],
                 'kwargs': {

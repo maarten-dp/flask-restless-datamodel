@@ -10,7 +10,7 @@ from flask.testing import make_test_environ_builder
 from .render import DataModelRenderer
 
 
-def catch_model_configuration(dispatch_request):
+def catch_model_configuration(dispatch_request, config):
     """
     This is the actual point where we catch the relevant configuration made
     by Flask-Restless. Currently we are only interested in the include and
@@ -39,10 +39,13 @@ def catch_model_configuration(dispatch_request):
         # Putting back the old and original dispatch_request method to continue
         # normal operation from this point on.
         self.__class__.dispatch_request = dispatch_request
-        return {
+        config.update({
             'include': list(include_columns),
-            'exclude': list(exclude_columns)
-        }
+            'exclude': list(exclude_columns),
+            'serializer': self.serialize,
+            'deserializer': self.deserialize
+        })
+        return {}
 
     return wrapper
 
@@ -156,17 +159,20 @@ class DataModel(object):
 
         view_func = app.view_functions[endpoint]
 
+        kwargs = {}
         dispatch_fn = catch_model_configuration(
-            view_func.view_class.dispatch_request)
+            view_func.view_class.dispatch_request, kwargs)
         view_func.view_class.dispatch_request = dispatch_fn
 
         with app.request_context(self.build_stub_environ(app)):
-            result = view_func().json
+            view_func().json
 
         return {
             'collection_name': api_info.collection_name,
-            'included': result['include'],
-            'excluded': result['exclude']
+            'included': kwargs['include'],
+            'excluded': kwargs['exclude'],
+            'serialize': kwargs['serializer'],
+            'deserialize': kwargs['deserializer'],
         }
 
     def build_stub_environ(self, app):
