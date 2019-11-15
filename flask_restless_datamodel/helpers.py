@@ -25,3 +25,9 @@ def run_object_method(instid, function_name, model):
     result = getattr(instance, function_name)(*params['args'],
                                               **params['kwargs'])
     return json.dumps({'payload': dumps(result, fmt='msgpack')})
+
+
+def get_object_property():
+    params = loads(flask.request.get_json()['payload'], fmt='msgpack')
+    result = getattr(params['object'], params['property'])
+    return json.dumps({'payload': dumps(result, fmt='msgpack')})

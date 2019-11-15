@@ -7,6 +7,7 @@ import pytest
 from flask_restless_datamodel import DataModel
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.ext.associationproxy import association_proxy
+from sqlalchemy.ext.hybrid import hybrid_property
 
 
 def test_datamodel(app, client_maker):
@@ -64,6 +65,7 @@ def test_datamodel(app, client_maker):
                     'relation_type': 'MANYTOONE'
                 }
             },
+            'properties': {},
             'methods': {}
         },
         'Person': {
@@ -73,6 +75,7 @@ def test_datamodel(app, client_maker):
                 'name': 'unicode'
             },
             'relations': {},
+            'properties': {},
             'methods': {}
         }
     }
@@ -118,6 +121,7 @@ def test_inheritance(app, client_maker):
                 'discriminator': 'unicode'
             },
             'relations': {},
+            'properties': {},
             'methods': {}
         },
         'Person': {
@@ -134,6 +138,7 @@ def test_inheritance(app, client_maker):
                 'discriminator': 'unicode'
             },
             'relations': {},
+            'properties': {},
             'methods': {}
         }
     }
@@ -161,6 +166,10 @@ def exposed_method_model_app(app):
         id = db.Column(db.Integer, primary_key=True)
         name = db.Column(db.Unicode, unique=True)
         birth_date = db.Column(db.Date)
+
+        @property
+        def id_to_text(self):
+            return 'one'
 
         def age_in_x_years_y_months(self,
                                     y_offset,
@@ -205,7 +214,10 @@ def test_exposed_methods(exposed_method_model_app, client_maker):
             'attributes': {
                 'id': 'integer',
                 'name': 'unicode',
-                'birth_date': 'date'
+                'birth_date': 'date',
+            },
+            'properties': {
+                'id_to_text': 'property'
             },
             'relations': {},
             'methods': {
@@ -274,3 +286,109 @@ def test_call_exposed_method_with_model(exposed_method_model_app,
     res = sr.loads(
         client.post(url, json=body).json()['payload'], fmt='msgpack')
     assert res.name == 'Jim Darkmagic'
+
+
+def test_it_can_identify_a_hybrid_property(app, client_maker):
+    db = SQLAlchemy(app)
+
+    class Person(db.Model):
+        id = db.Column(db.Integer, primary_key=True)
+        first_name = db.Column(db.Unicode)
+        last_name = db.Column(db.Unicode)
+
+        @hybrid_property
+        def name(self):
+            return "{} {}".format(self.first_name, self.last_name)
+
+    db.create_all()
+
+    manager = flask_restless.APIManager(app, flask_sqlalchemy_db=db)
+    manager.create_api(Person, methods=['GET'])
+    data_model = DataModel(manager)
+    manager.create_api(data_model, methods=['GET'])
+
+    expected = {
+        'Person': {
+            'attributes': {
+                'first_name': 'unicode',
+                'id': 'integer',
+                'last_name': 'unicode',
+                'name': 'hybrid'
+            },
+            'collection_name': 'person',
+            'methods': {},
+            'pk_name': 'id',
+            'properties': {},
+            'relations': {}
+        }
+    }
+
+    client = client_maker(app)
+    res = client.get('http://app/api/flask-restless-datamodel').json()
+    assert res == expected
+
+
+def test_it_can_identify_a_property(app, client_maker):
+    db = SQLAlchemy(app)
+
+    class Person(db.Model):
+        id = db.Column(db.Integer, primary_key=True)
+        first_name = db.Column(db.Unicode)
+        last_name = db.Column(db.Unicode)
+
+        @hybrid_property
+        def name(self):
+            return "{} {}".format(self.first_name, self.last_name)
+
+        @property
+        def lower_name(self):
+            return self.name.lower()
+
+    db.create_all()
+
+    manager = flask_restless.APIManager(app, flask_sqlalchemy_db=db)
+    manager.create_api(Person, methods=['GET'])
+    data_model = DataModel(manager)
+    manager.create_api(data_model, methods=['GET'])
+
+    expected = {
+        'Person': {
+            'attributes': {
+                'first_name': 'unicode',
+                'id': 'integer',
+                'last_name': 'unicode',
+                'name': 'hybrid',
+            },
+            'collection_name': 'person',
+            'methods': {},
+            'properties': {
+                'lower_name': 'property'
+            },
+            'pk_name': 'id',
+            'relations': {}
+        }
+    }
+
+    client = client_maker(app)
+    res = client.get('http://app/api/flask-restless-datamodel').json()
+    assert res == expected
+
+
+def test_it_can_get_a_property(exposed_method_model_app, client_maker):
+    client = client_maker(exposed_method_model_app)
+    url = 'http://app/api/property'
+
+    class Person:
+        id = 1
+
+    with patch('cereal_lazer.NAME_BY_CLASS') as NAME_BY_CLASS:
+        NAME_BY_CLASS.__getitem__.return_value = 'Person'
+        with patch('cereal_lazer.serialize.all.CLASSES') as CLASSES:
+            CLASSES.items.return_value = [(Person, (lambda x: {'id': 1}, None))]
+            body = to_method_params({
+                'object': Person(),
+                'property': 'id_to_text'
+            })
+    res = sr.loads(
+        client.post(url, json=body).json()['payload'], fmt='msgpack')
+    assert res == 'one'

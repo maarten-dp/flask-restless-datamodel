@@ -74,6 +74,7 @@ class ClassDefinitionRenderer:
 
         attribute_dict = self.render_attributes(model, is_valid)
         foreign_keys = self.render_relations(model, is_valid)
+        properties = self.render_properties(model, is_valid)
         attribute_dict.update(self.render_hybrid_properties(model, is_valid))
         self.render_association_proxies(model, attribute_dict, foreign_keys)
 
@@ -87,6 +88,7 @@ class ClassDefinitionRenderer:
             'collection_name': collection_name,
             'attributes': attribute_dict,
             'relations': foreign_keys,
+            'properties': properties
         }
 
     def render_attributes(self, model, is_valid):
@@ -113,6 +115,16 @@ class ClassDefinitionRenderer:
                     local_id = list(rel.local_columns)[0].key
                     foreign_keys[rel.key]['local_column'] = local_id
         return foreign_keys
+
+    def render_properties(self, model, is_valid):
+        attribute_dict = {}
+        properties = [
+            a for a in dir(model) if isinstance(getattr(model, a), property)
+        ]
+        for attribute in properties:
+            if is_valid(attribute):
+                attribute_dict[attribute] = 'property'
+        return attribute_dict
 
     def render_hybrid_properties(self, model, is_valid):
         attribute_dict = {}

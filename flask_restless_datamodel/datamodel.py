@@ -7,6 +7,7 @@ import flask_restless
 from flask import Response, abort
 from flask.testing import make_test_environ_builder
 
+from .helpers import get_object_property
 from .render import DataModelRenderer
 
 
@@ -91,7 +92,10 @@ class DataModel(object):
 
     def init(self, app):
         db = self.api_manager.flask_sqlalchemy_db
+        self.app = app
         self.model_renderer = DataModelRenderer(app, db, self.options)
+        if self.options.get('expose_property', True):
+            self.expose_property(app)
         # render datamodel for models that were already registered to
         # flask-restless
         for model, api_info in self.api_manager.created_apis_for.items():
@@ -183,3 +187,7 @@ class DataModel(object):
         finally:
             builder.close()
         return environ
+
+    def expose_property(self, app):
+        fmt = '/api/property'
+        app.add_url_rule(fmt, methods=['POST'], view_func=get_object_property)
