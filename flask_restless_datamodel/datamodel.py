@@ -1,7 +1,6 @@
 import json
 from collections import defaultdict
 from functools import wraps
-from itertools import chain
 
 import flask_restless
 from flask import Response, abort
@@ -33,10 +32,8 @@ def catch_model_configuration(dispatch_request, config):
         def clean(columns):
             return columns or []
 
-        include_columns = chain(
-            clean(self.include_columns), clean(self.include_relations))
-        exclude_columns = chain(
-            clean(self.exclude_columns), clean(self.exclude_relations))
+        include_columns = clean(self.include_columns)
+        exclude_columns = clean(self.exclude_columns)
         # Putting back the old and original dispatch_request method to continue
         # normal operation from this point on.
         self.__class__.dispatch_request = dispatch_request
