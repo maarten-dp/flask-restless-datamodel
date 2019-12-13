@@ -22,9 +22,14 @@ def run_object_method(instid, function_name, model):
     if not instance:
         return {}
     params = loads(flask.request.get_json()['payload'], fmt='msgpack')
-    result = getattr(instance, function_name)(*params['args'],
-                                              **params['kwargs'])
-    return json.dumps({'payload': dumps(result, fmt='msgpack')})
+    try:
+        result = getattr(instance, function_name)(*params['args'],
+                                                  **params['kwargs'])
+        return json.dumps({'payload': dumps(result, fmt='msgpack')})
+    except Exception as e:
+        resp = flask.jsonify(message=str(e))
+        resp.status_code = 500
+        flask.abort(resp)
 
 
 def get_object_property():

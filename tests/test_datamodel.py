@@ -191,6 +191,9 @@ def exposed_method_model_app(app):
             assert isinstance(person, Person)
             return person
 
+        def raise_an_error(self):
+            raise Exception('Something happened')
+
     db.create_all()
 
     db.session.add(Person(name='Jim Darkmagic', birth_date=date(2018, 1, 1)))
@@ -239,6 +242,12 @@ def test_exposed_methods(exposed_method_model_app, client_maker):
                     'argsvar': None,
                     'kwargsvar': None
                 },
+                'raise_an_error': {
+                    'args': [],
+                    'kwargs': [],
+                    'argsvar': None,
+                    'kwargsvar': None
+                },
             }
         }
     }
@@ -263,6 +272,17 @@ def test_call_exposed_method(exposed_method_model_app, client_maker):
         client.post(url, json=body).json()['payload'], fmt='msgpack')
     expected = date(2028, 4, 1)
     assert res == expected
+
+
+def test_call_exposed_method_raises_an_error(exposed_method_model_app,
+                                             client_maker):
+    client = client_maker(exposed_method_model_app)
+    url = 'http://app/api/method/person/1/raise_an_error'
+    body = to_method_params({'args': [], 'kwargs': {}})
+
+    res = client.post(url, json=body)
+    assert res.status_code == 500
+    assert res.json() == {'message': 'Something happened'}
 
 
 def test_call_exposed_method_with_model(exposed_method_model_app,
