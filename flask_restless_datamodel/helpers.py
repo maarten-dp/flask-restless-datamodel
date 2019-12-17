@@ -1,6 +1,7 @@
 import json
 
 import flask
+from sqlalchemy.orm.session import Session
 
 
 def cr():
@@ -20,7 +21,7 @@ def register_serializer(model, pk_name, serialize, deserialize, cr):
     cr.register_class(model.__name__, model, serialize_model, load_model)
 
 
-def run_object_method(instid, function_name, model):
+def run_object_method(instid, function_name, model, commit_on_return):
     instance = model.query.get(instid)
     if not instance:
         return {}
@@ -28,11 +29,21 @@ def run_object_method(instid, function_name, model):
     try:
         result = getattr(instance, function_name)(*params['args'],
                                                   **params['kwargs'])
-        return json.dumps({'payload': cr().dumps(result)})
+        result = json.dumps({'payload': cr().dumps(result)})
     except Exception as e:
-        resp = flask.jsonify(message=str(e))
+        msg = '{}: {}'.format(e.__class__.__name__, str(e))
+        resp = flask.jsonify(message=msg)
         resp.status_code = 500
         flask.abort(resp)
+
+    if commit_on_return:
+        try:
+            session = Session.object_session(instance)
+            session.commit()
+        except Exception:
+            pass
+
+    return result
 
 
 def get_object_property():

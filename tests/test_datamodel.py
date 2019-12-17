@@ -150,6 +150,15 @@ def test_inheritance(app, client_maker):
 
 @pytest.fixture(scope='function')
 def exposed_method_model_app(app):
+    return _exposed_method_model_app(app)
+
+
+@pytest.fixture(scope='function')
+def exposed_method_model_app_with_commit(app):
+    return _exposed_method_model_app(app, commit_before_return=True)
+
+
+def _exposed_method_model_app(app, commit_before_return=False):
     db = SQLAlchemy(app)
 
     class Person(db.Model):
@@ -184,6 +193,12 @@ def exposed_method_model_app(app):
         def raise_an_error(self):
             raise Exception('Something happened')
 
+        def create_person_but_dont_commit(self):
+            person = Person(name='Some dude')
+            db.session.add(person)
+            db.session.flush()
+            return person
+
     db.create_all()
 
     db.session.add(Person(name='Jim Darkmagic', birth_date=date(2018, 1, 1)))
@@ -191,7 +206,10 @@ def exposed_method_model_app(app):
 
     manager = flask_restless.APIManager(app, flask_sqlalchemy_db=db)
     manager.create_api(Person, methods=['GET'])
-    data_model = DataModel(manager, include_model_functions=True)
+    data_model = DataModel(
+        manager,
+        include_model_functions=True,
+        commit_on_method_return=commit_before_return)
     manager.create_api(data_model, methods=['GET'])
     return app
 
@@ -238,6 +256,12 @@ def test_exposed_methods(exposed_method_model_app, client_maker):
                     'argsvar': None,
                     'kwargsvar': None
                 },
+                'create_person_but_dont_commit': {
+                    'args': [],
+                    'kwargs': [],
+                    'argsvar': None,
+                    'kwargsvar': None
+                },
             }
         }
     }
@@ -273,7 +297,7 @@ def test_call_exposed_method_raises_an_error(exposed_method_model_app,
 
     res = client.post(url, json=body)
     assert res.status_code == 500
-    assert res.json() == {'message': 'Something happened'}
+    assert res.json() == {'message': 'Exception: Something happened'}
 
 
 def test_call_exposed_method_with_model(exposed_method_model_app,
@@ -297,6 +321,33 @@ def test_call_exposed_method_with_model(exposed_method_model_app,
     }, client_cereal)
     res = sr.loads(client.post(url, json=body).json()['payload'])
     assert res.name == 'Jim Darkmagic'
+
+
+def run_transient_method(client, status, sr):
+    url = 'http://app/api/method/person/1/create_person_but_dont_commit'
+    body = to_method_params({'args': [], 'kwargs': {}}, sr)
+    client_cereal = Cereal()
+    client_cereal.register_class('Person', None, None, lambda x: x)
+
+    res = client_cereal.loads(client.post(url, json=body).json()['payload'])
+    assert res == {'id': 2, 'name': 'Some dude', 'birth_date': None}
+
+    url = 'http://app/api/person/2'
+    assert client.get(url).status_code == status
+
+
+def test_it_doesnt_commit_transient_objects(exposed_method_model_app,
+                                            client_maker):
+    client = client_maker(exposed_method_model_app)
+    sr = exposed_method_model_app.extensions['cereal']
+    run_transient_method(client, 404, sr)
+
+
+def test_it_commits_transient_objects(exposed_method_model_app_with_commit,
+                                      client_maker):
+    client = client_maker(exposed_method_model_app_with_commit)
+    sr = exposed_method_model_app_with_commit.extensions['cereal']
+    run_transient_method(client, 200, sr)
 
 
 def test_it_can_identify_a_hybrid_property(app, client_maker):

@@ -222,11 +222,14 @@ class MethodDefinitionRenderer:
         for method in methods.keys():
             fmt = '/api/method/{0}/<instid>/{1}'
             instance_endpoint = fmt.format(collection_name, method)
+            commit_on_return = self.options.get('commit_on_method_return',
+                                                False)
             self.app.add_url_rule(
                 instance_endpoint,
                 methods=['POST'],
                 defaults={
                     'function_name': method,
                     'model': model,
+                    'commit_on_return': commit_on_return,
                 },
                 view_func=run_object_method)
