@@ -3,6 +3,7 @@ from collections import defaultdict
 from functools import wraps
 
 import flask_restless
+from cereal_lazer import Cereal
 from flask import Response, abort
 from flask.testing import make_test_environ_builder
 
@@ -86,10 +87,16 @@ class DataModel(object):
         self.options = options
         self.model_renderer = None
         self.app = None
+        self.cereal = Cereal(
+            raise_load_errors=options.pop('raise_load_errors', True),
+            serialize_naively=options.pop('serialize_naively', False))
 
     def init(self, app):
         db = self.api_manager.flask_sqlalchemy_db
         self.app = app
+        if not hasattr(app, 'extensions'):
+            app.extensions = {}
+        app.extensions['cereal'] = self.cereal
         self.model_renderer = DataModelRenderer(app, db, self.options)
         if self.options.get('expose_property', True):
             self.expose_property(app)

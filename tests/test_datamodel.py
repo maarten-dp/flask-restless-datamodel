@@ -1,9 +1,9 @@
 from datetime import date
 from unittest.mock import patch
 
-import cereal_lazer as sr
 import flask_restless
 import pytest
+from cereal_lazer import Cereal
 from flask_restless_datamodel import DataModel
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.ext.associationproxy import association_proxy
@@ -151,16 +151,6 @@ def test_inheritance(app, client_maker):
 @pytest.fixture(scope='function')
 def exposed_method_model_app(app):
     db = SQLAlchemy(app)
-    # reset serialize
-    sr.serialize.all.CLASSES = {
-        k: v
-        for k, v in sr.serialize.all.CLASSES.items() if 'date' in str(k)
-    }
-    sr.serialize.all.CLASSES_BY_NAME = {
-        k: v
-        for k, v in sr.serialize.all.CLASSES_BY_NAME.items()
-        if 'date' in str(k)
-    }
 
     class Person(db.Model):
         id = db.Column(db.Integer, primary_key=True)
@@ -254,12 +244,13 @@ def test_exposed_methods(exposed_method_model_app, client_maker):
     assert res == expected
 
 
-def to_method_params(body):
-    return {'payload': sr.dumps(body, fmt='msgpack')}
+def to_method_params(body, sr):
+    return {'payload': sr.dumps(body)}
 
 
 def test_call_exposed_method(exposed_method_model_app, client_maker):
     client = client_maker(exposed_method_model_app)
+    sr = exposed_method_model_app.extensions['cereal']
     url = 'http://app/api/method/person/1/age_in_x_years_y_months'
     body = to_method_params({
         'args': [],
@@ -267,9 +258,8 @@ def test_call_exposed_method(exposed_method_model_app, client_maker):
             'y_offset': 10,
             'm_offset': 3
         }
-    })
-    res = sr.loads(
-        client.post(url, json=body).json()['payload'], fmt='msgpack')
+    }, sr)
+    res = sr.loads(client.post(url, json=body).json()['payload'])
     expected = date(2028, 4, 1)
     assert res == expected
 
@@ -278,7 +268,8 @@ def test_call_exposed_method_raises_an_error(exposed_method_model_app,
                                              client_maker):
     client = client_maker(exposed_method_model_app)
     url = 'http://app/api/method/person/1/raise_an_error'
-    body = to_method_params({'args': [], 'kwargs': {}})
+    sr = exposed_method_model_app.extensions['cereal']
+    body = to_method_params({'args': [], 'kwargs': {}}, sr)
 
     res = client.post(url, json=body)
     assert res.status_code == 500
@@ -289,22 +280,22 @@ def test_call_exposed_method_with_model(exposed_method_model_app,
                                         client_maker):
     client = client_maker(exposed_method_model_app)
     url = 'http://app/api/method/person/1/what_does_this_func_even_do'
+    sr = exposed_method_model_app.extensions['cereal']
+    client_cereal = Cereal()
 
     class Person:
         id = 1
 
-    with patch('cereal_lazer.NAME_BY_CLASS') as NAME_BY_CLASS:
-        NAME_BY_CLASS.__getitem__.return_value = 'Person'
-        with patch('cereal_lazer.serialize.all.CLASSES') as CLASSES:
-            CLASSES.items.return_value = [(Person, (lambda x: {'id': 1}, None))]
-            body = to_method_params({
-                'args': [],
-                'kwargs': {
-                    'person': Person()
-                }
-            })
-    res = sr.loads(
-        client.post(url, json=body).json()['payload'], fmt='msgpack')
+    client_cereal.register_class('Person', Person, lambda x: {'id': x.id},
+                                 lambda x: x)
+
+    body = to_method_params({
+        'args': [],
+        'kwargs': {
+            'person': Person()
+        }
+    }, client_cereal)
+    res = sr.loads(client.post(url, json=body).json()['payload'])
     assert res.name == 'Jim Darkmagic'
 
 
@@ -397,18 +388,18 @@ def test_it_can_identify_a_property(app, client_maker):
 def test_it_can_get_a_property(exposed_method_model_app, client_maker):
     client = client_maker(exposed_method_model_app)
     url = 'http://app/api/property'
+    sr = exposed_method_model_app.extensions['cereal']
+    client_cereal = Cereal()
 
     class Person:
         id = 1
 
-    with patch('cereal_lazer.NAME_BY_CLASS') as NAME_BY_CLASS:
-        NAME_BY_CLASS.__getitem__.return_value = 'Person'
-        with patch('cereal_lazer.serialize.all.CLASSES') as CLASSES:
-            CLASSES.items.return_value = [(Person, (lambda x: {'id': 1}, None))]
-            body = to_method_params({
-                'object': Person(),
-                'property': 'id_to_text'
-            })
-    res = sr.loads(
-        client.post(url, json=body).json()['payload'], fmt='msgpack')
+    client_cereal.register_class('Person', Person, lambda x: {'id': x.id},
+                                 lambda x: x)
+
+    body = to_method_params({
+        'object': Person(),
+        'property': 'id_to_text'
+    }, client_cereal)
+    res = sr.loads(client.post(url, json=body).json()['payload'])
     assert res == 'one'

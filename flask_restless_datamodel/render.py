@@ -81,7 +81,8 @@ class ClassDefinitionRenderer:
         with self.app.app_context():
             pk_name = primary_key_name(model)
 
-        register_serializer(model, pk_name, serialize, deserialize)
+        cr = self.app.extensions['cereal']
+        register_serializer(model, pk_name, serialize, deserialize, cr)
 
         return {
             'pk_name': pk_name,
