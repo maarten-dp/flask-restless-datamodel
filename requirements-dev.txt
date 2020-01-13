@@ -10,5 +10,5 @@ pytest >= 4.5.0
 pytest-cov
 pytest-xdist
 
-requests-flask-adapter==0.0.3
+requests-flask-adapter==0.0.5
 yapf

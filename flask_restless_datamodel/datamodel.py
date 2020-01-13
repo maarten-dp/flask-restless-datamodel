@@ -5,7 +5,7 @@ from functools import wraps
 import flask_restless
 from cereal_lazer import Cereal
 from flask import Response, abort
-from flask.testing import make_test_environ_builder
+from flask.testing import EnvironBuilder
 
 from .helpers import get_object_property
 from .render import DataModelRenderer
@@ -185,7 +185,7 @@ class DataModel(object):
 
     def build_stub_environ(self, app):
         kw = {'base_url': 'http://localhost'}
-        builder = make_test_environ_builder(self.app, **kw)
+        builder = EnvironBuilder(self.app, **kw)
         try:
             environ = builder.get_environ()
         finally:
