@@ -9,6 +9,10 @@ from sqlalchemy.orm.properties import ColumnProperty, RelationshipProperty
 from .helpers import register_serializer, run_object_method
 
 
+def clean(columns):
+    return columns or []
+
+
 def get_is_valid_validator(included, excluded):
     def is_valid(column):
         column = column.split('.')[-1]
@@ -38,9 +42,8 @@ class DataModelRenderer:
         self.model_renderer = ClassDefinitionRenderer(app)
         self.method_renderer = MethodDefinitionRenderer(app, options)
 
-    def render(self, model, kwargs):
-        collection_name = kwargs['collection_name']
-        model_render = self.model_renderer.render(model, **kwargs)
+    def render(self, model, view, collection_name):
+        model_render = self.model_renderer.render(model, collection_name, view)
         model_render['methods'] = self.method_renderer.render(
             model, collection_name)
         return model_render
@@ -68,9 +71,9 @@ class ClassDefinitionRenderer:
     def __init__(self, app):
         self.app = app
 
-    def render(self, model, collection_name, included, excluded, serialize,
-               deserialize):
-        is_valid = get_is_valid_validator(included, excluded)
+    def render(self, model, collection_name, view):
+        is_valid = get_is_valid_validator(
+            clean(view.include_columns), clean(view.exclude_columns))
 
         attribute_dict = self.render_attributes(model, is_valid)
         foreign_keys = self.render_relations(model, is_valid)
@@ -82,7 +85,8 @@ class ClassDefinitionRenderer:
             pk_name = primary_key_name(model)
 
         cr = self.app.extensions['cereal']
-        register_serializer(model, pk_name, serialize, deserialize, cr)
+        register_serializer(model, pk_name, view.serialize, view.deserialize,
+                            cr)
 
         return {
             'pk_name': pk_name,
@@ -134,8 +138,9 @@ class ClassDefinitionRenderer:
             if isinstance(a, hybrid_property)
         ]
         for attribute in hybrid_properties:
-            if is_valid(attribute.__name__):
-                attribute_dict[attribute.__name__] = 'hybrid'
+            name = attribute.__name__
+            if is_valid(name):
+                attribute_dict[name] = 'hybrid'
         return attribute_dict
 
     def render_association_proxies(self, model, attribute_dict, foreign_keys):

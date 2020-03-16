@@ -11,7 +11,7 @@ from .helpers import get_object_property
 from .render import DataModelRenderer
 
 
-def catch_model_configuration(dispatch_request, config):
+def catch_model_view(dispatch_request, getaway_car):
     """
     This is the actual point where we catch the relevant configuration made
     by Flask-Restless. Currently we are only interested in the include and
@@ -30,20 +30,10 @@ def catch_model_configuration(dispatch_request, config):
     """
 
     def wrapper(self, *args, **kwargs):
-        def clean(columns):
-            return columns or []
-
-        include_columns = clean(self.include_columns)
-        exclude_columns = clean(self.exclude_columns)
         # Putting back the old and original dispatch_request method to continue
         # normal operation from this point on.
         self.__class__.dispatch_request = dispatch_request
-        config.update({
-            'include': list(include_columns),
-            'exclude': list(exclude_columns),
-            'serializer': self.serialize,
-            'deserializer': self.deserialize
-        })
+        getaway_car.append(self)
         return {}
 
     return wrapper
@@ -86,6 +76,7 @@ class DataModel(object):
         self.polymorphic_info = defaultdict(dict)
         self.options = options
         self.model_renderer = None
+        self.model_views = {}
         self.app = None
         self.cereal = Cereal(
             raise_load_errors=options.pop('raise_load_errors', True),
@@ -107,8 +98,9 @@ class DataModel(object):
 
     def register_model(self, model, api_info, app):
         name = model.__name__
-        kwargs = self.get_restless_model_conf(model, api_info, app)
-        render = self.model_renderer.render(model, kwargs)
+        view = self.get_restless_view(model, api_info, app)
+        collection_name = api_info.collection_name
+        render = self.model_renderer.render(model, view, collection_name)
 
         polymorphic_info = self.model_renderer.render_polymorphic(
             model, self.polymorphic_info[name])
@@ -152,7 +144,7 @@ class DataModel(object):
                 response=json.dumps(self.data_model),
                 mimetype='application/json'))
 
-    def get_restless_model_conf(self, model, api_info, app):
+    def get_restless_view(self, model, api_info, app):
         """
         This method will try to find the corresponding view within the registered
         blueprints in flask-restless and momentarily replace it with a function
@@ -167,21 +159,16 @@ class DataModel(object):
 
         view_func = app.view_functions[endpoint]
 
-        kwargs = {}
-        dispatch_fn = catch_model_configuration(
-            view_func.view_class.dispatch_request, kwargs)
+        getaway_car = []
+        dispatch_fn = catch_model_view(view_func.view_class.dispatch_request,
+                                       getaway_car)
         view_func.view_class.dispatch_request = dispatch_fn
 
         with app.request_context(self.build_stub_environ(app)):
             view_func().json
 
-        return {
-            'collection_name': api_info.collection_name,
-            'included': kwargs['include'],
-            'excluded': kwargs['exclude'],
-            'serialize': kwargs['serializer'],
-            'deserialize': kwargs['deserializer'],
-        }
+        view = getaway_car[0]
+        return view
 
     def build_stub_environ(self, app):
         kw = {'base_url': 'http://localhost'}
