@@ -1,7 +1,11 @@
 import json
+from collections import namedtuple
 
 import flask
 from sqlalchemy.orm.session import Session
+
+ModelConfiguration = namedtuple('ModelConfiguration',
+                                'collection_name view blueprint')
 
 
 def cr():
@@ -46,7 +50,9 @@ def run_object_method(instid, function_name, model, commit_on_return):
     return result
 
 
-def get_object_property():
-    params = cr().loads(flask.request.get_json()['payload'])
-    result = getattr(params['object'], params['property'])
+def get_object_property(instid, model, property_name):
+    instance = model.query.get(instid)
+    if not instance:
+        return {}
+    result = getattr(instance, property_name)
     return json.dumps({'payload': cr().dumps(result)})

@@ -4,7 +4,7 @@ from unittest.mock import patch
 import flask_restless
 import pytest
 from cereal_lazer import Cereal
-from flask_restless_datamodel import DataModel
+from flask_restless_datamodel import DataModel, __version__
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy.ext.hybrid import hybrid_property
@@ -42,9 +42,13 @@ def test_datamodel(app, client_maker):
         exclude_columns=['name'])
 
     expected = {
+        'FlaskRestlessDatamodel': {
+            'server_version': __version__
+        },
         'Computer': {
             'pk_name': 'id',
             'collection_name': 'compjutahs',
+            'url_prefix': '/api',
             'attributes': {
                 'id': 'integer',
                 'owner_id': 'integer',
@@ -71,6 +75,7 @@ def test_datamodel(app, client_maker):
         'Person': {
             'pk_name': 'id',
             'collection_name': 'person',
+            'url_prefix': '/api',
             'attributes': {
                 'name': 'unicode'
             },
@@ -108,9 +113,13 @@ def test_inheritance(app, client_maker):
     manager.create_api(data_model, methods=['GET'])
 
     expected = {
+        'FlaskRestlessDatamodel': {
+            'server_version': __version__
+        },
         'Engineer': {
             'pk_name': 'id',
             'collection_name': 'engineer',
+            'url_prefix': '/api',
             'polymorphic': {
                 'identity': 'engineer',
                 'parent': 'Person',
@@ -127,6 +136,7 @@ def test_inheritance(app, client_maker):
         'Person': {
             'pk_name': 'id',
             'collection_name': 'person',
+            'url_prefix': '/api',
             'polymorphic': {
                 'on': 'discriminator',
                 'identities': {
@@ -219,9 +229,13 @@ def test_exposed_methods(exposed_method_model_app, client_maker):
     res = client.get('http://app/api/flask-restless-datamodel').json()
 
     expected = {
+        'FlaskRestlessDatamodel': {
+            'server_version': __version__
+        },
         'Person': {
             'pk_name': 'id',
             'collection_name': 'person',
+            'url_prefix': '/api',
             'attributes': {
                 'id': 'integer',
                 'name': 'unicode',
@@ -370,6 +384,9 @@ def test_it_can_identify_a_hybrid_property(app, client_maker):
     manager.create_api(data_model, methods=['GET'])
 
     expected = {
+        'FlaskRestlessDatamodel': {
+            'server_version': __version__
+        },
         'Person': {
             'attributes': {
                 'first_name': 'unicode',
@@ -378,10 +395,11 @@ def test_it_can_identify_a_hybrid_property(app, client_maker):
                 'name': 'hybrid'
             },
             'collection_name': 'person',
+            'url_prefix': '/api',
             'methods': {},
             'pk_name': 'id',
             'properties': {},
-            'relations': {}
+            'relations': {},
         }
     }
 
@@ -414,6 +432,9 @@ def test_it_can_identify_a_property(app, client_maker):
     manager.create_api(data_model, methods=['GET'])
 
     expected = {
+        'FlaskRestlessDatamodel': {
+            'server_version': __version__
+        },
         'Person': {
             'attributes': {
                 'first_name': 'unicode',
@@ -422,6 +443,7 @@ def test_it_can_identify_a_property(app, client_maker):
                 'name': 'hybrid',
             },
             'collection_name': 'person',
+            'url_prefix': '/api',
             'methods': {},
             'properties': {
                 'lower_name': 'property'
@@ -438,7 +460,7 @@ def test_it_can_identify_a_property(app, client_maker):
 
 def test_it_can_get_a_property(exposed_method_model_app, client_maker):
     client = client_maker(exposed_method_model_app)
-    url = 'http://app/api/property'
+    url = 'http://app/api/property/person/1/id_to_text'
     sr = exposed_method_model_app.extensions['cereal']
     client_cereal = Cereal()
 

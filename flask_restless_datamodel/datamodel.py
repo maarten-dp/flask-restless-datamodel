@@ -6,8 +6,9 @@ import flask_restless
 from cereal_lazer import Cereal
 from flask import Response, abort
 from flask.testing import EnvironBuilder
+from pbr.version import VersionInfo
 
-from .helpers import get_object_property
+from .helpers import ModelConfiguration
 from .render import DataModelRenderer
 
 
@@ -72,7 +73,12 @@ class DataModel(object):
         api_manager.create_api_blueprint = attach_listener(
             api_manager.create_api_blueprint, self)
         self.api_manager = api_manager
-        self.data_model = {}
+        vi = VersionInfo('flask_restless_client')
+        self.data_model = {
+            'FlaskRestlessDatamodel': {
+                'server_version': vi.release_string()
+            }
+        }
         self.polymorphic_info = defaultdict(dict)
         self.options = options
         self.model_renderer = None
@@ -89,8 +95,6 @@ class DataModel(object):
             app.extensions = {}
         app.extensions['cereal'] = self.cereal
         self.model_renderer = DataModelRenderer(app, db, self.options)
-        if self.options.get('expose_property', True):
-            self.expose_property(app)
         # render datamodel for models that were already registered to
         # flask-restless
         for model, api_info in self.api_manager.created_apis_for.items():
@@ -99,8 +103,11 @@ class DataModel(object):
     def register_model(self, model, api_info, app):
         name = model.__name__
         view = self.get_restless_view(model, api_info, app)
+        blueprint = app.blueprints[api_info.blueprint_name]
         collection_name = api_info.collection_name
-        render = self.model_renderer.render(model, view, collection_name)
+
+        conf = ModelConfiguration(collection_name, view, blueprint)
+        render = self.model_renderer.render(model, conf)
 
         polymorphic_info = self.model_renderer.render_polymorphic(
             model, self.polymorphic_info[name])
@@ -114,6 +121,7 @@ class DataModel(object):
             render['polymorphic'] = polymorphic_info
 
         self.data_model[name] = render
+        self.app.register_blueprint(blueprint)
 
     @property
     def processors(self):
@@ -178,7 +186,3 @@ class DataModel(object):
         finally:
             builder.close()
         return environ
-
-    def expose_property(self, app):
-        fmt = '/api/property'
-        app.add_url_rule(fmt, methods=['POST'], view_func=get_object_property)

@@ -6,7 +6,11 @@ from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.inspection import inspect as sqla_inspect
 from sqlalchemy.orm.properties import ColumnProperty, RelationshipProperty
 
-from .helpers import register_serializer, run_object_method
+from .helpers import get_object_property, register_serializer, run_object_method
+
+INCLUDE_INTERNAL = 'include_model_internal_functions'
+COMMIT_ON_RETURN = 'commit_on_method_return'
+EXPOSE_PROPERTY = 'expose_property'
 
 
 def clean(columns):
@@ -37,15 +41,13 @@ def is_polymorphic(model, check_var):
 class DataModelRenderer:
     def __init__(self, app, db, options):
         self.app = app
-        self.db = db
         self.options = options
-        self.model_renderer = ClassDefinitionRenderer(app)
-        self.method_renderer = MethodDefinitionRenderer(app, options)
 
-    def render(self, model, view, collection_name):
-        model_render = self.model_renderer.render(model, collection_name, view)
-        model_render['methods'] = self.method_renderer.render(
-            model, collection_name)
+    def render(self, model, config):
+        klass = ClassDefinitionRenderer(self.app, self.options, model, config)
+        methods = MethodDefinitionRenderer(self.options, model, config)
+        model_render = klass.render()
+        model_render['methods'] = methods.render()
         return model_render
 
     def render_polymorphic(self, model, identities):
@@ -68,46 +70,55 @@ class DataModelRenderer:
 
 
 class ClassDefinitionRenderer:
-    def __init__(self, app):
+    def __init__(self, app, options, model, config):
         self.app = app
+        self.model = model
+        self.options = options
+        self.config = config
+        self.is_valid = get_is_valid_validator(
+            clean(config.view.include_columns),
+            clean(config.view.exclude_columns))
 
-    def render(self, model, collection_name, view):
-        is_valid = get_is_valid_validator(
-            clean(view.include_columns), clean(view.exclude_columns))
+    def render(self):
+        view = self.config.view
+        collection_name = self.config.collection_name
 
-        attribute_dict = self.render_attributes(model, is_valid)
-        foreign_keys = self.render_relations(model, is_valid)
-        properties = self.render_properties(model, is_valid)
-        attribute_dict.update(self.render_hybrid_properties(model, is_valid))
-        self.render_association_proxies(model, attribute_dict, foreign_keys)
+        attribute_dict = self.render_attributes()
+        foreign_keys = self.render_relations()
+        properties = {}
+        if self.options.get(EXPOSE_PROPERTY, True):
+            properties = self.render_properties()
+        attribute_dict.update(self.render_hybrid_properties())
+        self.render_association_proxies(attribute_dict, foreign_keys)
 
         with self.app.app_context():
-            pk_name = primary_key_name(model)
+            pk_name = primary_key_name(self.model)
 
         cr = self.app.extensions['cereal']
-        register_serializer(model, pk_name, view.serialize, view.deserialize,
-                            cr)
+        register_serializer(self.model, pk_name, view.serialize,
+                            view.deserialize, cr)
 
         return {
             'pk_name': pk_name,
             'collection_name': collection_name,
+            'url_prefix': self.config.blueprint.url_prefix,
             'attributes': attribute_dict,
             'relations': foreign_keys,
-            'properties': properties
+            'properties': properties,
         }
 
-    def render_attributes(self, model, is_valid):
+    def render_attributes(self):
         attribute_dict = {}
-        for column in sqla_inspect(model).columns:
-            if is_valid(column.name):
+        for column in sqla_inspect(self.model).columns:
+            if self.is_valid(column.name):
                 ctype = column.type.__class__.__name__.lower()
                 attribute_dict[column.name] = ctype
         return attribute_dict
 
-    def render_relations(self, model, is_valid):
+    def render_relations(self):
         foreign_keys = {}
-        for rel in sqla_inspect(model).relationships:
-            if is_valid(str(rel.key)):
+        for rel in sqla_inspect(self.model).relationships:
+            if self.is_valid(str(rel.key)):
                 direction = rel.direction.name
                 if rel.direction.name == 'ONETOMANY' and not rel.uselist:
                     direction = 'ONETOONE'
@@ -121,32 +132,35 @@ class ClassDefinitionRenderer:
                     foreign_keys[rel.key]['local_column'] = local_id
         return foreign_keys
 
-    def render_properties(self, model, is_valid):
+    def render_properties(self):
         attribute_dict = {}
         properties = [
-            a for a in dir(model) if isinstance(getattr(model, a), property)
+            a for a in dir(self.model)
+            if isinstance(getattr(self.model, a), property)
         ]
         for attribute in properties:
-            if is_valid(attribute):
+            if self.is_valid(attribute):
+                self.add_property_endpoint(attribute)
                 attribute_dict[attribute] = 'property'
+
         return attribute_dict
 
-    def render_hybrid_properties(self, model, is_valid):
+    def render_hybrid_properties(self):
         attribute_dict = {}
         hybrid_properties = [
-            a for a in sqla_inspect(model).all_orm_descriptors
+            a for a in sqla_inspect(self.model).all_orm_descriptors
             if isinstance(a, hybrid_property)
         ]
         for attribute in hybrid_properties:
             name = attribute.__name__
-            if is_valid(name):
+            if self.is_valid(name):
                 attribute_dict[name] = 'hybrid'
         return attribute_dict
 
-    def render_association_proxies(self, model, attribute_dict, foreign_keys):
+    def render_association_proxies(self, attribute_dict, foreign_keys):
         proxies = {}
-        for k in list(model.__dict__.keys()):
-            v = model.__dict__[k]
+        for k in list(self.model.__dict__.keys()):
+            v = self.model.__dict__[k]
             is_proxy = isinstance(v, AssociationProxy)
             # keep the proxies where the remote attr has a property,
             # as we need this property to identify the remote class
@@ -154,8 +168,8 @@ class ClassDefinitionRenderer:
             # v == v.__get__(None, model), but we do this to bind the model to
             # the remote_attr and from then on it's usable for further inspection
             if is_proxy and hasattr(
-                    v.__get__(None, model).remote_attr, 'property'):
-                proxies[k] = v.__get__(None, model)
+                    v.__get__(None, self.model).remote_attr, 'property'):
+                proxies[k] = v.__get__(None, self.model)
 
         for name, attr in proxies.items():
             # check if the remote attr is a relation (for example, an association
@@ -176,23 +190,35 @@ class ClassDefinitionRenderer:
                 column = attr.remote_attr.property.columns[0]
                 attribute_dict[name] = column.type.__class__.__name__.lower()
 
+    def add_property_endpoint(self, property_name):
+        fmt = '/property/{0}/<instid>/{1}'
+        endpoint = fmt.format(self.config.collection_name, property_name)
+        self.config.blueprint.add_url_rule(
+            endpoint,
+            methods=['POST'],
+            defaults={
+                'model': self.model,
+                'property_name': property_name
+            },
+            view_func=get_object_property)
+
 
 class MethodDefinitionRenderer:
-    def __init__(self, app, options):
-        self.app = app
+    def __init__(self, options, model, config):
         self.options = options
+        self.model = model
+        self.config = config
 
-    def render(self, model, collection_name):
-        methods = self.compile_method_list(model)
-        self.add_method_endpoints(collection_name, model, methods)
+    def render(self):
+        methods = self.compile_method_list()
+        self.add_method_endpoints(methods)
         return methods
 
-    def compile_method_list(self, model):
+    def compile_method_list(self):
         methods = {}
-        include_internal = self.options.get('include_model_internal_functions',
-                                            False)
+        include_internal = self.options.get(INCLUDE_INTERNAL, False)
         for name, fn in inspect.getmembers(
-                model, predicate=inspect.isfunction):
+                self.model, predicate=inspect.isfunction):
             if name.startswith('__'):
                 continue
             if name.startswith('_') and not include_internal:
@@ -223,18 +249,18 @@ class MethodDefinitionRenderer:
             }
         return methods
 
-    def add_method_endpoints(self, collection_name, model, methods):
+    def add_method_endpoints(self, methods):
+        commit_on_return = self.options.get(COMMIT_ON_RETURN, False)
+        collection_name = self.config.collection_name
         for method in methods.keys():
-            fmt = '/api/method/{0}/<instid>/{1}'
+            fmt = '/method/{0}/<instid>/{1}'
             instance_endpoint = fmt.format(collection_name, method)
-            commit_on_return = self.options.get('commit_on_method_return',
-                                                False)
-            self.app.add_url_rule(
+            self.config.blueprint.add_url_rule(
                 instance_endpoint,
                 methods=['POST'],
                 defaults={
                     'function_name': method,
-                    'model': model,
+                    'model': self.model,
                     'commit_on_return': commit_on_return,
                 },
                 view_func=run_object_method)
