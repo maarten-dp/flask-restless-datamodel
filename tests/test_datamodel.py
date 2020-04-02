@@ -43,7 +43,8 @@ def test_datamodel(app, client_maker):
 
     expected = {
         'FlaskRestlessDatamodel': {
-            'server_version': __version__
+            'server_version': __version__,
+            'serialize_naively': False,
         },
         'Computer': {
             'pk_name': 'id',
@@ -114,7 +115,8 @@ def test_inheritance(app, client_maker):
 
     expected = {
         'FlaskRestlessDatamodel': {
-            'server_version': __version__
+            'server_version': __version__,
+            'serialize_naively': False,
         },
         'Engineer': {
             'pk_name': 'id',
@@ -180,6 +182,14 @@ def _exposed_method_model_app(app, commit_before_return=False):
         def id_to_text(self):
             return 'one'
 
+        @property
+        def settable_property(self):
+            return self.name
+
+        @settable_property.setter
+        def settable_property(self, value):
+            self.name = value
+
         def age_in_x_years_y_months(self,
                                     y_offset,
                                     m_offset=0,
@@ -209,6 +219,7 @@ def _exposed_method_model_app(app, commit_before_return=False):
             db.session.flush()
             return person
 
+    app.Person = Person
     db.create_all()
 
     db.session.add(Person(name='Jim Darkmagic', birth_date=date(2018, 1, 1)))
@@ -230,7 +241,8 @@ def test_exposed_methods(exposed_method_model_app, client_maker):
 
     expected = {
         'FlaskRestlessDatamodel': {
-            'server_version': __version__
+            'server_version': __version__,
+            'serialize_naively': False,
         },
         'Person': {
             'pk_name': 'id',
@@ -242,7 +254,8 @@ def test_exposed_methods(exposed_method_model_app, client_maker):
                 'birth_date': 'date',
             },
             'properties': {
-                'id_to_text': 'property'
+                'id_to_text': False,
+                'settable_property': True
             },
             'relations': {},
             'methods': {
@@ -385,7 +398,8 @@ def test_it_can_identify_a_hybrid_property(app, client_maker):
 
     expected = {
         'FlaskRestlessDatamodel': {
-            'server_version': __version__
+            'server_version': __version__,
+            'serialize_naively': False,
         },
         'Person': {
             'attributes': {
@@ -433,7 +447,8 @@ def test_it_can_identify_a_property(app, client_maker):
 
     expected = {
         'FlaskRestlessDatamodel': {
-            'server_version': __version__
+            'server_version': __version__,
+            'serialize_naively': False,
         },
         'Person': {
             'attributes': {
@@ -446,7 +461,7 @@ def test_it_can_identify_a_property(app, client_maker):
             'url_prefix': '/api',
             'methods': {},
             'properties': {
-                'lower_name': 'property'
+                'lower_name': False
             },
             'pk_name': 'id',
             'relations': {}
@@ -462,17 +477,18 @@ def test_it_can_get_a_property(exposed_method_model_app, client_maker):
     client = client_maker(exposed_method_model_app)
     url = 'http://app/api/property/person/1/id_to_text'
     sr = exposed_method_model_app.extensions['cereal']
-    client_cereal = Cereal()
-
-    class Person:
-        id = 1
-
-    client_cereal.register_class('Person', Person, lambda x: {'id': x.id},
-                                 lambda x: x)
-
-    body = to_method_params({
-        'object': Person(),
-        'property': 'id_to_text'
-    }, client_cereal)
-    res = sr.loads(client.post(url, json=body).json()['payload'])
+    res = sr.loads(client.get(url).json()['payload'])
     assert res == 'one'
+
+
+def test_it_can_set_a_property(exposed_method_model_app, client_maker):
+    app = exposed_method_model_app
+    client = client_maker(app)
+    url = 'http://app/api/property/person/1/settable_property'
+    sr = app.extensions['cereal']
+    expected = 'new_value'
+
+    body = sr.dumps(expected)
+    res = client.post(url, json=body)
+    person = app.Person.query.get(1)
+    assert person.name == expected

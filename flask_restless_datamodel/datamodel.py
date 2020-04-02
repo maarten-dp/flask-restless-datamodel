@@ -74,9 +74,11 @@ class DataModel(object):
             api_manager.create_api_blueprint, self)
         self.api_manager = api_manager
         vi = VersionInfo('flask_restless_client')
+        serialize_naively = options.get('serialize_naively', False)
         self.data_model = {
             'FlaskRestlessDatamodel': {
-                'server_version': vi.release_string()
+                'server_version': vi.release_string(),
+                'serialize_naively': serialize_naively
             }
         }
         self.polymorphic_info = defaultdict(dict)
@@ -85,8 +87,8 @@ class DataModel(object):
         self.model_views = {}
         self.app = None
         self.cereal = Cereal(
-            raise_load_errors=options.pop('raise_load_errors', True),
-            serialize_naively=options.pop('serialize_naively', False))
+            raise_load_errors=options.get('raise_load_errors', True),
+            serialize_naively=serialize_naively)
 
     def init(self, app):
         db = self.api_manager.flask_sqlalchemy_db

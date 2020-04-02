@@ -6,7 +6,7 @@ from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.inspection import inspect as sqla_inspect
 from sqlalchemy.orm.properties import ColumnProperty, RelationshipProperty
 
-from .helpers import get_object_property, register_serializer, run_object_method
+from .helpers import object_property, register_serializer, run_object_method
 
 INCLUDE_INTERNAL = 'include_model_internal_functions'
 COMMIT_ON_RETURN = 'commit_on_method_return'
@@ -134,14 +134,13 @@ class ClassDefinitionRenderer:
 
     def render_properties(self):
         attribute_dict = {}
-        properties = [
-            a for a in dir(self.model)
-            if isinstance(getattr(self.model, a), property)
-        ]
-        for attribute in properties:
+        properties = [(a, getattr(self.model, a).fset is not None)
+                      for a in dir(self.model)
+                      if isinstance(getattr(self.model, a), property)]
+        for attribute, settable in properties:
             if self.is_valid(attribute):
                 self.add_property_endpoint(attribute)
-                attribute_dict[attribute] = 'property'
+                attribute_dict[attribute] = settable
 
         return attribute_dict
 
@@ -195,12 +194,12 @@ class ClassDefinitionRenderer:
         endpoint = fmt.format(self.config.collection_name, property_name)
         self.config.blueprint.add_url_rule(
             endpoint,
-            methods=['POST'],
+            methods=['GET', 'POST'],
             defaults={
                 'model': self.model,
                 'property_name': property_name
             },
-            view_func=get_object_property)
+            view_func=object_property)
 
 
 class MethodDefinitionRenderer:

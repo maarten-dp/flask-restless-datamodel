@@ -1,4 +1,4 @@
-__all__ = ('__version__', 'patches', 'DataModel')
+__all__ = ('__version__', 'DataModel')
 
 from pbr.version import VersionInfo
 
