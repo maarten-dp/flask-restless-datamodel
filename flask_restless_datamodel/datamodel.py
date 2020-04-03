@@ -73,7 +73,7 @@ class DataModel(object):
         api_manager.create_api_blueprint = attach_listener(
             api_manager.create_api_blueprint, self)
         self.api_manager = api_manager
-        vi = VersionInfo('flask_restless_client')
+        vi = VersionInfo('flask-restless-datamodel')
         serialize_naively = options.get('serialize_naively', False)
         self.data_model = {
             'FlaskRestlessDatamodel': {
