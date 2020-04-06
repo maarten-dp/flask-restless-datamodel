@@ -2,8 +2,7 @@ import inspect
 import sys
 
 import flask_restless
-from packaging import version
-from pbr.version import VersionInfo
+from pbr.version import SemanticVersion, VersionInfo
 
 
 def primary_key_names(model):
@@ -81,8 +80,8 @@ def apply_patches():
                 setattr(sys.modules[mod], funcname, func)
 
 
-sqla_version = version.parse(VersionInfo('sqlalchemy').release_string())
-if sqla_version >= version.parse('1.3.0'):
+sqla_version = VersionInfo('sqlalchemy').semantic_version()
+if sqla_version >= SemanticVersion(1, 3, 0):
     from sqlalchemy.ext.associationproxy import (
         AssociationProxy, ObjectAssociationProxyInstance)
     from sqlalchemy.orm import (RelationshipProperty as RelProperty,
