@@ -1,7 +1,9 @@
 import inspect
 
 from flask_restless.helpers import get_related_association_proxy_model, primary_key_name
-from sqlalchemy.ext.associationproxy import AssociationProxy
+from sqlalchemy.ext.associationproxy import AssociationProxy  # noqa
+from sqlalchemy.ext.associationproxy import ColumnAssociationProxyInstance  # noqa
+from sqlalchemy.ext.associationproxy import ObjectAssociationProxyInstance  # noqa
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.inspection import inspect as sqla_inspect
 from sqlalchemy.orm.properties import ColumnProperty, RelationshipProperty
@@ -158,8 +160,13 @@ class ClassDefinitionRenderer:
 
     def render_association_proxies(self, attribute_dict, foreign_keys):
         proxies = {}
-        for k in list(self.model.__dict__.keys()):
-            v = self.model.__dict__[k]
+        for k in dir(self.model):
+            if k.startswith('_AssociationProxy'):
+                continue
+            v = getattr(self.model, k)
+            if isinstance(v, (ObjectAssociationProxyInstance,
+                              ColumnAssociationProxyInstance)):
+                v = v.parent
             is_proxy = isinstance(v, AssociationProxy)
             # keep the proxies where the remote attr has a property,
             # as we need this property to identify the remote class
