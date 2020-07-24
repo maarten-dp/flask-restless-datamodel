@@ -40,6 +40,14 @@ def is_polymorphic(model, check_var):
     return False
 
 
+def verify_association_attr(k, v):
+    if hasattr(v, 'parent'):
+        if isinstance(v.parent, AssociationProxy):
+            if k.startswith('_{}'.format(v.parent.__class__.__name__)):
+                return False
+    return True
+
+
 class DataModelRenderer:
     def __init__(self, app, db, options):
         self.app = app
@@ -160,10 +168,11 @@ class ClassDefinitionRenderer:
 
     def render_association_proxies(self, attribute_dict, foreign_keys):
         proxies = {}
+
         for k in dir(self.model):
-            if k.startswith('_AssociationProxy'):
-                continue
             v = getattr(self.model, k)
+            if not verify_association_attr(k, v):
+                continue
             if isinstance(v, (ObjectAssociationProxyInstance,
                               ColumnAssociationProxyInstance)):
                 v = v.parent
