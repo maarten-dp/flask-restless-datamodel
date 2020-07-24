@@ -174,9 +174,12 @@ def _exposed_method_model_app(app, commit_before_return=False):
     db = SQLAlchemy(app)
 
     class Person(db.Model):
+        _api_exclude = ["secret_key", "reset_secret_key"]
+
         id = db.Column(db.Integer, primary_key=True)
         name = db.Column(db.Unicode, unique=True)
         birth_date = db.Column(db.Date)
+        secret_key = db.Column(db.String)
 
         @property
         def id_to_text(self):
@@ -219,6 +222,9 @@ def _exposed_method_model_app(app, commit_before_return=False):
             db.session.flush()
             return person
 
+        def reset_secret_key(self):
+            self.secret_key = None
+
     app.Person = Person
     db.create_all()
 
@@ -226,13 +232,24 @@ def _exposed_method_model_app(app, commit_before_return=False):
     db.session.commit()
 
     manager = flask_restless.APIManager(app, flask_sqlalchemy_db=db)
-    manager.create_api(Person, methods=['GET'])
+    manager.create_api(
+        Person, methods=['GET'], exclude_columns=Person._api_exclude)
     data_model = DataModel(
         manager,
         include_model_functions=True,
         commit_on_method_return=commit_before_return)
     manager.create_api(data_model, methods=['GET'])
     return app
+
+
+def test_excluded_attr_and_method_are_not_exposed(exposed_method_model_app,
+                                                  client_maker):
+    client = client_maker(exposed_method_model_app)
+    res = client.get('http://app/api/flask-restless-datamodel').json()
+
+    person_exposed_model = res['Person']
+    assert 'secret_key' not in person_exposed_model['attributes'].keys()
+    assert 'reset_secret_key' not in person_exposed_model['methods'].keys()
 
 
 def test_exposed_methods(exposed_method_model_app, client_maker):

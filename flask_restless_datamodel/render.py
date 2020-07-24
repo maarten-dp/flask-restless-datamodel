@@ -222,12 +222,15 @@ class MethodDefinitionRenderer:
 
     def compile_method_list(self):
         methods = {}
+        attributes_and_methods_to_exclude = self.config.view.exclude_columns
         include_internal = self.options.get(INCLUDE_INTERNAL, False)
         for name, fn in inspect.getmembers(
                 self.model, predicate=inspect.isfunction):
             if name.startswith('__'):
                 continue
             if name.startswith('_') and not include_internal:
+                continue
+            if name in attributes_and_methods_to_exclude:
                 continue
 
             spec = inspect.signature(fn)
