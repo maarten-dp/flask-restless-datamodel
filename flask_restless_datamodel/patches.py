@@ -66,9 +66,33 @@ def is_like_list(instance, relation):
     return False
 
 
+def _sub_operator(model, argument, fieldname):
+    """Recursively calls :func:`QueryBuilder._create_operation` when argument
+    is a dictionary of the form specified in :ref:`search`.
+    This function is for use with the ``has`` and ``any`` search operations.
+    """
+    if isinstance(model, InstrumentedAttribute):
+        submodel = model.property.mapper.class_
+    elif isinstance(model, ASSOCIATION_PROXIES_KLASSES):
+        submodel = get_related_association_proxy_model(model)
+    else:  # TODO what to do here?
+        pass
+    if isinstance(argument, dict):
+        fieldname = argument['name']
+        operator = argument['op']
+        argument = argument.get('val')
+        relation = None
+        if '__' in fieldname:
+            fieldname, relation = fieldname.split('__')
+        return QueryBuilder._create_operation(submodel, fieldname, operator,
+                                              argument, relation)
+    # Support legacy has/any with implicit eq operator
+    return getattr(submodel, fieldname) == argument
+
+
 def apply_patches():
     needs_patching = (primary_key_names, get_related_model, get_relations,
-                      is_like_list)
+                      is_like_list, _sub_operator)
 
     for func in needs_patching:
         funcname = func.__name__
@@ -86,7 +110,10 @@ if sqla_version >= SemanticVersion(1, 3, 0):
         AssociationProxy, ObjectAssociationProxyInstance)
     from sqlalchemy.orm import (RelationshipProperty as RelProperty,
                                 ColumnProperty)
-    from sqlalchemy.orm.attributes import QueryableAttribute
+    from sqlalchemy.orm.attributes import (QueryableAttribute,
+                                           InstrumentedAttribute)
+    from flask_restless.helpers import get_related_association_proxy_model
+    from flask_restless.search import QueryBuilder
 
     ASSOCIATION_PROXIES_KLASSES = (AssociationProxy,
                                    ObjectAssociationProxyInstance)
