@@ -239,8 +239,9 @@ class MethodDefinitionRenderer:
                 continue
             if name.startswith('_') and not include_internal:
                 continue
-            if name in attributes_and_methods_to_exclude:
-                continue
+            if attributes_and_methods_to_exclude:
+                if name in attributes_and_methods_to_exclude:
+                    continue
 
             spec = inspect.signature(fn)
             required = []
