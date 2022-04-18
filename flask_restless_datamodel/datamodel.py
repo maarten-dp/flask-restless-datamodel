@@ -49,9 +49,11 @@ def attach_listener(create_blueprint, data_model):
             kwargs['preprocessors'] = data_model.processors
             return create_blueprint(model, *args, **kwargs)
         blueprint = create_blueprint(model, *args, **kwargs)
-        app.register_blueprint(blueprint)
+        blueprint_name = f"{blueprint.name}.canary"
+        # this register is needed to capture the view in get_restless_view
+        app.register_blueprint(blueprint, name=blueprint_name)
         api_info = data_model.api_manager.created_apis_for[model]
-        data_model.register_model(model, api_info, app)
+        data_model.register_model(model, api_info, app, bp_name=blueprint_name)
         return blueprint
 
     return wrapper
@@ -102,11 +104,15 @@ class DataModel(object):
         for model, api_info in self.api_manager.created_apis_for.items():
             self.register_model(model, api_info, app)
 
-    def register_model(self, model, api_info, app):
+    def register_model(self, model, api_info, app, bp_name=None):
         name = model.__name__
-        view = self.get_restless_view(model, api_info, app)
-        blueprint = app.blueprints[api_info.blueprint_name]
+        blueprint_name = api_info.blueprint_name
+        if bp_name is not None:
+            blueprint_name = bp_name
+        blueprint = app.blueprints[blueprint_name]
         collection_name = api_info.collection_name
+
+        view = self.get_restless_view(model, app, blueprint_name, collection_name)
 
         conf = ModelConfiguration(collection_name, view, blueprint)
         render = self.model_renderer.render(model, conf)
@@ -123,7 +129,9 @@ class DataModel(object):
             render['polymorphic'] = polymorphic_info
 
         self.data_model[name] = render
-        self.app.register_blueprint(blueprint)
+        # this register is needed to register the addtional endpoints we create
+        # should look into making a different blueprint for this.
+        self.app.register_blueprint(blueprint, name=collection_name)
 
     @property
     def processors(self):
@@ -154,7 +162,7 @@ class DataModel(object):
                 response=json.dumps(self.data_model),
                 mimetype='application/json'))
 
-    def get_restless_view(self, model, api_info, app):
+    def get_restless_view(self, model, app, blueprint_name, collection_name):
         """
         This method will try to find the corresponding view within the registered
         blueprints in flask-restless and momentarily replace it with a function
@@ -165,7 +173,7 @@ class DataModel(object):
         original function.
         """
         api_format = flask_restless.APIManager.APINAME_FORMAT
-        endpoint = api_format.format('{1}.{0}'.format(*api_info))
+        endpoint = api_format.format(f'{blueprint_name}.{collection_name}')
 
         view_func = app.view_functions[endpoint]
 
