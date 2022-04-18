@@ -112,7 +112,8 @@ class DataModel(object):
         blueprint = app.blueprints[blueprint_name]
         collection_name = api_info.collection_name
 
-        view = self.get_restless_view(model, app, blueprint_name, collection_name)
+        view = self.get_restless_view(model, app, blueprint_name,
+                                      collection_name)
 
         conf = ModelConfiguration(collection_name, view, blueprint)
         render = self.model_renderer.render(model, conf)
