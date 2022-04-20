@@ -132,7 +132,8 @@ class DataModel(object):
         self.data_model[name] = render
         # this register is needed to register the addtional endpoints we create
         # should look into making a different blueprint for this.
-        self.app.register_blueprint(blueprint, name=collection_name)
+        rpc_blueprint_name = f"{collection_name}.rpc"
+        self.app.register_blueprint(blueprint, name=rpc_blueprint_name)
 
     @property
     def processors(self):
