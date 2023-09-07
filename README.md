@@ -28,6 +28,8 @@ manager = flask_restless.APIManager(app, flask_sqlalchemy_db=db)
 manager.create_api(Person, methods=['GET'], include_columns=['name'])
 manager.create_api(Computer, methods=['GET'], collection_name='compjutahs', exclude_columns=['name'])
 manager.create_api(data_model, methods=['GET'])
+# In case you want to expose the methods and properties as well
+data_model.register_rpc_blueprint()
 ```
 
 Which will expose an endpoint `http://localhost:5000/flask-restless-datamodel` which in turn will yield a result as followed
