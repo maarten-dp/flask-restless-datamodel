@@ -118,3 +118,6 @@ if sqla_version >= SemanticVersion(1, 3, 0):
     ASSOCIATION_PROXIES_KLASSES = (AssociationProxy,
                                    ObjectAssociationProxyInstance)
     apply_patches()
+
+if sqla_version >= SemanticVersion(2,0,0):
+    flask_restless.helpers.hybrid.HYBRID_PROPERTY = flask_restless.helpers.hybrid.HybridExtensionType.HYBRID_PROPERTY

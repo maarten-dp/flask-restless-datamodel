@@ -1,5 +1,4 @@
 from datetime import date
-from unittest.mock import patch
 
 import flask_restless
 import pytest
@@ -239,6 +238,8 @@ def _exposed_method_model_app(app, commit_before_return=False):
         include_model_functions=True,
         commit_on_method_return=commit_before_return)
     manager.create_api(data_model, methods=['GET'])
+    data_model.register_rpc_blueprint()
+
     return app
 
 
@@ -404,7 +405,7 @@ def test_it_can_identify_a_hybrid_property(app, client_maker):
 
         @hybrid_property
         def name(self):
-            return "{} {}".format(self.first_name, self.last_name)
+            return f"{self.first_name} {self.last_name}"
 
     db.create_all()
 

@@ -208,7 +208,7 @@ class ClassDefinitionRenderer:
     def add_property_endpoint(self, property_name):
         fmt = '/property/{0}/<instid>/{1}'
         endpoint = fmt.format(self.config.collection_name, property_name)
-        self.config.blueprint.add_url_rule(
+        self.config.rpc_blueprint.add_url_rule(
             endpoint,
             methods=['GET', 'POST'],
             defaults={
@@ -274,7 +274,7 @@ class MethodDefinitionRenderer:
         for method in methods.keys():
             fmt = '/method/{0}/<instid>/{1}'
             instance_endpoint = fmt.format(collection_name, method)
-            self.config.blueprint.add_url_rule(
+            self.config.rpc_blueprint.add_url_rule(
                 instance_endpoint,
                 methods=['POST'],
                 defaults={
