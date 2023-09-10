@@ -51,6 +51,9 @@ def run_object_method(instid, function_name, model, commit_on_return):
             session.commit()
         except Exception:
             pass
+    else:
+        session = Session.object_session(instance)
+        session.rollback()
 
     return result
 
