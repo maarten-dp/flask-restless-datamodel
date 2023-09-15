@@ -5,6 +5,7 @@ from functools import wraps
 import flask_restless
 from cereal_lazer import Cereal
 from flask import Response, abort
+from flask.blueprints import Blueprint
 from flask.testing import EnvironBuilder
 from pbr.version import VersionInfo
 
@@ -75,6 +76,9 @@ class DataModel(object):
         api_manager.create_api_blueprint = attach_listener(
             api_manager.create_api_blueprint, self)
         self.api_manager = api_manager
+        self.rpc_blueprint= Blueprint("flask-restless-datamodel-rpc",
+                                      "flask-restless-datamodel-rpc",
+                                      url_prefix=options.get("api_prefix", "/api"))
         vi = VersionInfo('flask-restless-datamodel')
         serialize_naively = options.get('serialize_naively', False)
         self.data_model = {
@@ -86,6 +90,7 @@ class DataModel(object):
         self.polymorphic_info = defaultdict(dict)
         self.options = options
         self.model_renderer = None
+
         self.model_views = {}
         self.app = None
         self.cereal = Cereal(
@@ -98,6 +103,7 @@ class DataModel(object):
         if not hasattr(app, 'extensions'):
             app.extensions = {}
         app.extensions['cereal'] = self.cereal
+
         self.model_renderer = DataModelRenderer(app, db, self.options)
         # render datamodel for models that were already registered to
         # flask-restless
@@ -115,7 +121,7 @@ class DataModel(object):
         view = self.get_restless_view(model, app, blueprint_name,
                                       collection_name)
 
-        conf = ModelConfiguration(collection_name, view, blueprint)
+        conf = ModelConfiguration(collection_name, view, blueprint, self.rpc_blueprint)
         render = self.model_renderer.render(model, conf)
 
         polymorphic_info = self.model_renderer.render_polymorphic(
@@ -130,10 +136,11 @@ class DataModel(object):
             render['polymorphic'] = polymorphic_info
 
         self.data_model[name] = render
+
+    def register_rpc_blueprint(self):
         # this register is needed to register the addtional endpoints we create
         # should look into making a different blueprint for this.
-        rpc_blueprint_name = f"{collection_name}.rpc"
-        self.app.register_blueprint(blueprint, name=rpc_blueprint_name)
+        self.app.register_blueprint(self.rpc_blueprint)
 
     @property
     def processors(self):
@@ -187,7 +194,7 @@ class DataModel(object):
         with app.request_context(self.build_stub_environ(app)):
             view_func().json
 
-        view = getaway_car[0]
+        view: flask_restless.views.API = getaway_car[0]
         return view
 
     def build_stub_environ(self, app):

@@ -9,7 +9,8 @@ def app():
     app.config['DEBUG'] = True
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    return app
+    with app.app_context():
+        yield app
 
 
 @pytest.fixture(scope='function')

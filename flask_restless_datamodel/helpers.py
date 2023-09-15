@@ -5,7 +5,7 @@ import flask
 from sqlalchemy.orm.session import Session
 
 ModelConfiguration = namedtuple('ModelConfiguration',
-                                'collection_name view blueprint')
+                                'collection_name view blueprint rpc_blueprint')
 
 
 def abort(msg):
@@ -39,9 +39,10 @@ def run_object_method(instid, function_name, model, commit_on_return):
     try:
         result = getattr(instance, function_name)(*params['args'],
                                                   **params['kwargs'])
-        result = json.dumps({'payload': cr().dumps(result)})
+        payload = cr().dumps(result)
+        result = json.dumps({'payload': payload})
     except Exception as e:
-        msg = '{}: {}'.format(e.__class__.__name__, str(e))
+        msg = f'{e.__class__.__name__}: {str(e)}'
         abort(msg)
 
     if commit_on_return:
@@ -50,6 +51,9 @@ def run_object_method(instid, function_name, model, commit_on_return):
             session.commit()
         except Exception:
             pass
+    else:
+        session = Session.object_session(instance)
+        session.rollback()
 
     return result
 
