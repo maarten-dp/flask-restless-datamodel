@@ -4,8 +4,9 @@ from collections import namedtuple
 import flask
 from sqlalchemy.orm.session import Session
 
-ModelConfiguration = namedtuple('ModelConfiguration',
-                                'collection_name view blueprint rpc_blueprint')
+ModelConfiguration = namedtuple(
+    "ModelConfiguration", "collection_name view blueprint rpc_blueprint"
+)
 
 
 def abort(msg):
@@ -15,7 +16,7 @@ def abort(msg):
 
 
 def cr():
-    return flask.current_app.extensions['cereal']
+    return flask.current_app.extensions["cereal"]
 
 
 def register_serializer(model, pk_name, serialize, deserialize, cr):
@@ -35,14 +36,13 @@ def run_object_method(instid, function_name, model, commit_on_return):
     instance = model.query.get(instid)
     if not instance:
         return {}
-    params = cr().loads(flask.request.get_json()['payload'])
+    params = cr().loads(flask.request.get_json()["payload"])
     try:
-        result = getattr(instance, function_name)(*params['args'],
-                                                  **params['kwargs'])
+        result = getattr(instance, function_name)(*params["args"], **params["kwargs"])
         payload = cr().dumps(result)
-        result = json.dumps({'payload': payload})
+        result = json.dumps({"payload": payload})
     except Exception as e:
-        msg = f'{e.__class__.__name__}: {str(e)}'
+        msg = f"{e.__class__.__name__}: {str(e)}"
         abort(msg)
 
     if commit_on_return:
@@ -59,7 +59,7 @@ def run_object_method(instid, function_name, model, commit_on_return):
 
 
 def object_property(instid, model, property_name):
-    if flask.request.method == 'GET':
+    if flask.request.method == "GET":
         return get_object_property(instid, model, property_name)
     else:
         return set_object_property(instid, model, property_name)
@@ -70,7 +70,7 @@ def get_object_property(instid, model, property_name):
     if not instance:
         return {}
     result = getattr(instance, property_name)
-    return json.dumps({'payload': cr().dumps(result)})
+    return json.dumps({"payload": cr().dumps(result)})
 
 
 def set_object_property(instid, model, property_name):
@@ -85,4 +85,4 @@ def set_object_property(instid, model, property_name):
         session.commit()
     except Exception as e:
         abort("Could not set property: {}".format(e))
-    return json.dumps({'message': 'success'})
+    return json.dumps({"message": "success"})

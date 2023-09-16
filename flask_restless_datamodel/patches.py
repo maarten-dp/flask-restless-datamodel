@@ -8,9 +8,11 @@ from pbr.version import SemanticVersion, VersionInfo
 def primary_key_names(model):
     """Returns all the primary keys for a model."""
     return [
-        key for key, field in inspect.getmembers(model)
-        if isinstance(field, QueryableAttribute) and hasattr(
-            field, 'property') and isinstance(field.property, ColumnProperty)
+        key
+        for key, field in inspect.getmembers(model)
+        if isinstance(field, QueryableAttribute)
+        and hasattr(field, "property")
+        and isinstance(field.property, ColumnProperty)
         and field.property.columns[0].primary_key
     ]
 
@@ -22,12 +24,10 @@ def get_related_model(model, relationname):
     """
     if hasattr(model, relationname):
         attr = getattr(model, relationname)
-        if hasattr(attr, 'property') \
-                and isinstance(attr.property, RelProperty):
+        if hasattr(attr, "property") and isinstance(attr.property, RelProperty):
             return attr.property.mapper.class_
         if isinstance(attr, ASSOCIATION_PROXIES_KLASSES):
-            return flask_restless.helpers.get_related_association_proxy_model(
-                attr)
+            return flask_restless.helpers.get_related_association_proxy_model(attr)
     return None
 
 
@@ -35,11 +35,12 @@ def get_relations(model):
     """Returns a list of relation names of `model` (as a list of strings)."""
 
     def is_accepted(k):
-        return (not (k.startswith('__')
-                     or k in flask_restless.helpers.RELATION_BLACKLIST)
-                and not k.startswith("_AssociationProxy")
-                and not k.startswith("_ReadOnlyAssociationProxy")
-                and get_related_model(model, k))
+        return (
+            not (k.startswith("__") or k in flask_restless.helpers.RELATION_BLACKLIST)
+            and not k.startswith("_AssociationProxy")
+            and not k.startswith("_ReadOnlyAssociationProxy")
+            and get_related_model(model, k)
+        )
 
     return [k for k in dir(model) if is_accepted(k)]
 
@@ -56,7 +57,7 @@ def is_like_list(instance, relation):
         return instance._sa_class_manager[relation].property.uselist
     elif hasattr(instance, relation):
         attr = getattr(instance._sa_instance_state.class_, relation)
-        if hasattr(attr, 'property'):
+        if hasattr(attr, "property"):
             return attr.property.uselist
     related_value = getattr(type(instance), relation, None)
     if isinstance(related_value, ASSOCIATION_PROXIES_KLASSES):
@@ -78,46 +79,51 @@ def _sub_operator(model, argument, fieldname):
     else:  # TODO what to do here?
         pass
     if isinstance(argument, dict):
-        fieldname = argument['name']
-        operator = argument['op']
-        argument = argument.get('val')
+        fieldname = argument["name"]
+        operator = argument["op"]
+        argument = argument.get("val")
         relation = None
-        if '__' in fieldname:
-            fieldname, relation = fieldname.split('__')
-        return QueryBuilder._create_operation(submodel, fieldname, operator,
-                                              argument, relation)
+        if "__" in fieldname:
+            fieldname, relation = fieldname.split("__")
+        return QueryBuilder._create_operation(
+            submodel, fieldname, operator, argument, relation
+        )
     # Support legacy has/any with implicit eq operator
     return getattr(submodel, fieldname) == argument
 
 
 def apply_patches():
-    needs_patching = (primary_key_names, get_related_model, get_relations,
-                      is_like_list, _sub_operator)
+    needs_patching = (
+        primary_key_names,
+        get_related_model,
+        get_relations,
+        is_like_list,
+        _sub_operator,
+    )
 
     for func in needs_patching:
         funcname = func.__name__
-        restless_mods = [
-            m for m in sys.modules if m.startswith('flask_restless')
-        ]
+        restless_mods = [m for m in sys.modules if m.startswith("flask_restless")]
         for mod in restless_mods:
             if funcname in dir(sys.modules[mod]):
                 setattr(sys.modules[mod], funcname, func)
 
 
-sqla_version = VersionInfo('sqlalchemy').semantic_version()
+sqla_version = VersionInfo("sqlalchemy").semantic_version()
 if sqla_version >= SemanticVersion(1, 3, 0):
     from sqlalchemy.ext.associationproxy import (
-        AssociationProxy, ObjectAssociationProxyInstance)
-    from sqlalchemy.orm import (RelationshipProperty as RelProperty,
-                                ColumnProperty)
-    from sqlalchemy.orm.attributes import (QueryableAttribute,
-                                           InstrumentedAttribute)
+        AssociationProxy,
+        ObjectAssociationProxyInstance,
+    )
+    from sqlalchemy.orm import RelationshipProperty as RelProperty, ColumnProperty
+    from sqlalchemy.orm.attributes import QueryableAttribute, InstrumentedAttribute
     from flask_restless.helpers import get_related_association_proxy_model
     from flask_restless.search import QueryBuilder
 
-    ASSOCIATION_PROXIES_KLASSES = (AssociationProxy,
-                                   ObjectAssociationProxyInstance)
+    ASSOCIATION_PROXIES_KLASSES = (AssociationProxy, ObjectAssociationProxyInstance)
     apply_patches()
 
-if sqla_version >= SemanticVersion(2,0,0):
-    flask_restless.helpers.hybrid.HYBRID_PROPERTY = flask_restless.helpers.hybrid.HybridExtensionType.HYBRID_PROPERTY
+if sqla_version >= SemanticVersion(2, 0, 0):
+    flask_restless.helpers.hybrid.HYBRID_PROPERTY = (
+        flask_restless.helpers.hybrid.HybridExtensionType.HYBRID_PROPERTY
+    )

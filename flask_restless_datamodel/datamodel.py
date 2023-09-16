@@ -44,10 +44,10 @@ def catch_model_view(dispatch_request, getaway_car):
 def attach_listener(create_blueprint, data_model):
     @wraps(create_blueprint)
     def wrapper(model, *args, **kwargs):
-        app = kwargs.get('app', data_model.api_manager.app)
+        app = kwargs.get("app", data_model.api_manager.app)
         if isinstance(model, DataModel):
             data_model.init(app)
-            kwargs['preprocessors'] = data_model.processors
+            kwargs["preprocessors"] = data_model.processors
             return create_blueprint(model, *args, **kwargs)
         blueprint = create_blueprint(model, *args, **kwargs)
         blueprint_name = f"{blueprint.name}.canary"
@@ -61,7 +61,7 @@ def attach_listener(create_blueprint, data_model):
 
 
 class DataModel(object):
-    __tablename__ = 'flask-restless-datamodel'
+    __tablename__ = "flask-restless-datamodel"
 
     def __init__(self, api_manager, **options):
         """
@@ -74,17 +74,20 @@ class DataModel(object):
         like they are registering just another model they want to expose.
         """
         api_manager.create_api_blueprint = attach_listener(
-            api_manager.create_api_blueprint, self)
+            api_manager.create_api_blueprint, self
+        )
         self.api_manager = api_manager
-        self.rpc_blueprint= Blueprint("flask-restless-datamodel-rpc",
-                                      "flask-restless-datamodel-rpc",
-                                      url_prefix=options.get("api_prefix", "/api"))
-        vi = VersionInfo('flask-restless-datamodel')
-        serialize_naively = options.get('serialize_naively', False)
+        self.rpc_blueprint = Blueprint(
+            "flask-restless-datamodel-rpc",
+            "flask-restless-datamodel-rpc",
+            url_prefix=options.get("api_prefix", "/api"),
+        )
+        vi = VersionInfo("flask-restless-datamodel")
+        serialize_naively = options.get("serialize_naively", False)
         self.data_model = {
-            'FlaskRestlessDatamodel': {
-                'server_version': vi.release_string(),
-                'serialize_naively': serialize_naively
+            "FlaskRestlessDatamodel": {
+                "server_version": vi.release_string(),
+                "serialize_naively": serialize_naively,
             }
         }
         self.polymorphic_info = defaultdict(dict)
@@ -94,15 +97,16 @@ class DataModel(object):
         self.model_views = {}
         self.app = None
         self.cereal = Cereal(
-            raise_load_errors=options.get('raise_load_errors', True),
-            serialize_naively=serialize_naively)
+            raise_load_errors=options.get("raise_load_errors", True),
+            serialize_naively=serialize_naively,
+        )
 
     def init(self, app):
         db = self.api_manager.flask_sqlalchemy_db
         self.app = app
-        if not hasattr(app, 'extensions'):
+        if not hasattr(app, "extensions"):
             app.extensions = {}
-        app.extensions['cereal'] = self.cereal
+        app.extensions["cereal"] = self.cereal
 
         self.model_renderer = DataModelRenderer(app, db, self.options)
         # render datamodel for models that were already registered to
@@ -118,22 +122,22 @@ class DataModel(object):
         blueprint = app.blueprints[blueprint_name]
         collection_name = api_info.collection_name
 
-        view = self.get_restless_view(model, app, blueprint_name,
-                                      collection_name)
+        view = self.get_restless_view(model, app, blueprint_name, collection_name)
 
         conf = ModelConfiguration(collection_name, view, blueprint, self.rpc_blueprint)
         render = self.model_renderer.render(model, conf)
 
         polymorphic_info = self.model_renderer.render_polymorphic(
-            model, self.polymorphic_info[name])
+            model, self.polymorphic_info[name]
+        )
 
-        if 'parent' in polymorphic_info:
-            parent = polymorphic_info['parent']
-            identity = polymorphic_info['identity']
+        if "parent" in polymorphic_info:
+            parent = polymorphic_info["parent"]
+            identity = polymorphic_info["identity"]
             self.polymorphic_info[parent][identity] = name
 
         if polymorphic_info:
-            render['polymorphic'] = polymorphic_info
+            render["polymorphic"] = polymorphic_info
 
         self.data_model[name] = render
 
@@ -145,8 +149,8 @@ class DataModel(object):
     @property
     def processors(self):
         return {
-            'GET': [self.intercept_and_return_datamodel],
-            'GET_MANY': [self.intercept_and_return_datamodel]
+            "GET": [self.intercept_and_return_datamodel],
+            "GET_MANY": [self.intercept_and_return_datamodel],
         }
 
     def intercept_and_return_datamodel(self, *args, **kwargs):
@@ -167,9 +171,8 @@ class DataModel(object):
         # (Mis)using the flask abort to return the datamodel before the
         # request gets forwarded to the actual db querying
         abort(
-            Response(
-                response=json.dumps(self.data_model),
-                mimetype='application/json'))
+            Response(response=json.dumps(self.data_model), mimetype="application/json")
+        )
 
     def get_restless_view(self, model, app, blueprint_name, collection_name):
         """
@@ -182,13 +185,14 @@ class DataModel(object):
         original function.
         """
         api_format = flask_restless.APIManager.APINAME_FORMAT
-        endpoint = api_format.format(f'{blueprint_name}.{collection_name}')
+        endpoint = api_format.format(f"{blueprint_name}.{collection_name}")
 
         view_func = app.view_functions[endpoint]
 
         getaway_car = []
-        dispatch_fn = catch_model_view(view_func.view_class.dispatch_request,
-                                       getaway_car)
+        dispatch_fn = catch_model_view(
+            view_func.view_class.dispatch_request, getaway_car
+        )
         view_func.view_class.dispatch_request = dispatch_fn
 
         with app.request_context(self.build_stub_environ(app)):
@@ -198,7 +202,7 @@ class DataModel(object):
         return view
 
     def build_stub_environ(self, app):
-        kw = {'base_url': 'http://localhost'}
+        kw = {"base_url": "http://localhost"}
         builder = EnvironBuilder(self.app, **kw)
         try:
             environ = builder.get_environ()
