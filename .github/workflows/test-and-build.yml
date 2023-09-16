@@ -14,6 +14,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+        with:
+            fetch-depth: 0
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v4
         with:
@@ -26,7 +28,8 @@ jobs:
           pip install -r requirements-dev.txt
       - name: Build package
         run: python -m build
-      - name: Publish package
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          password: ${{ secrets.PYPIAPITOKEN }}
+      # - name: Publish package
+      #   uses: pypa/gh-action-pypi-publish@release/v1
+      #   with:
+      #     user: __token__
+      #     password: ${{ secrets.PYPIAPITOKEN }}
