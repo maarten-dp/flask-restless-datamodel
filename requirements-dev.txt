@@ -12,3 +12,4 @@ pytest-xdist
 
 requests-flask-adapter==0.0.5
 yapf
+build
